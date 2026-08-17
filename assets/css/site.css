@@ -120,14 +120,27 @@ a:hover {
 }
 
 .brand-logo {
-  height: 1.9rem;
   width: auto;
+}
+
+.brand-logo-apsn {
+  height: 2.75rem;
+}
+
+.brand-divider {
+  width: 1px;
+  align-self: stretch;
+  background: var(--border);
+}
+
+.brand-logo-bigten {
+  height: 2.1rem;
 }
 
 .brand-title {
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 1.25rem;
+  font-size: 1.5rem;
   letter-spacing: 0.01em;
   text-transform: uppercase;
 }
@@ -208,6 +221,68 @@ main {
   color: var(--text-faint);
   font-size: 0.85rem;
   margin: 0;
+}
+
+.team-filter {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding: 0.25rem 0.1rem 1rem;
+  margin-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.team-filter-chip {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0.35rem;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.team-filter-chip img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.team-filter-chip:hover {
+  border-color: var(--text-faint);
+}
+
+.team-filter-chip.is-active {
+  border-color: var(--red);
+  box-shadow: 0 0 0 2px var(--red-wash);
+}
+
+.team-filter-chip[data-team-filter='all'] {
+  width: auto;
+  height: 2.5rem;
+  border-radius: var(--radius-sm);
+  padding: 0 0.85rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.team-filter-chip[data-team-filter='all'].is-active {
+  color: var(--text);
+}
+
+.game-card.is-filtered-out {
+  display: none;
 }
 
 .game-grid {
@@ -413,19 +488,6 @@ main {
 
 .summary-body p:last-child {
   margin-bottom: 0;
-}
-
-.ai-label {
-  display: inline-block;
-  margin: 0 0 0.5rem;
-  padding: 0.15rem 0.5rem;
-  border: 1px solid var(--red-text);
-  color: var(--red-text);
-  font-size: 0.7rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  border-radius: var(--radius-sm);
 }
 
 .summary-sources {

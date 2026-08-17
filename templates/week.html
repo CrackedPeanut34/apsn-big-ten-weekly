@@ -26,9 +26,18 @@
     {% endif %}
   </div>
 
+  <div class="team-filter" role="group" aria-label="Filter by team">
+    <button type="button" class="team-filter-chip is-active" data-team-filter="all">All teams</button>
+    {% for t in teams %}
+    <button type="button" class="team-filter-chip" data-team-filter="{{ t.school }}" title="{{ t.school }}" aria-label="{{ t.school }}">
+      <img src="{{ t.logo_url or '' }}" alt="" loading="lazy">
+    </button>
+    {% endfor %}
+  </div>
+
   <div class="game-grid">
     {% for card in cards %}
-    <article class="game-card" id="game-{{ card.id }}">
+    <article class="game-card" id="game-{{ card.id }}" data-teams="{{ card.home_school }}|{{ card.away_school }}">
       <header class="game-card-header">
         <div class="matchup">
           <div class="team team-away">
@@ -85,9 +94,6 @@
 
       {% if card.summary %}
       <div class="summary-block">
-        {% if card.summary.generated_by == 'llm' %}
-        <p class="ai-label">AI-generated &mdash; verify before acting</p>
-        {% endif %}
         <div class="summary-body">{{ card.summary.html|safe }}</div>
         {% if card.summary.sources %}
         <ul class="summary-sources">

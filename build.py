@@ -308,6 +308,13 @@ def render_week(conn, env: Environment, season: int, week: int, all_weeks: list[
     ]
     cards.sort(key=lambda c: c["sort_key"])
 
+    teams_seen = {}
+    for c in cards:
+        for prefix in ("home", "away"):
+            school = c[f"{prefix}_school"]
+            teams_seen.setdefault(school, {"school": school, "logo_url": c[f"{prefix}_logo_url"]})
+    teams = sorted(teams_seen.values(), key=lambda t: t["school"])
+
     last_collected_display = None
     if last_collected is not None:
         last_collected_display = last_collected.astimezone(EASTERN).strftime("%b %-d, %Y %-I:%M %p ET")
@@ -318,6 +325,7 @@ def render_week(conn, env: Environment, season: int, week: int, all_weeks: list[
         season=season,
         week=week,
         cards=cards,
+        teams=teams,
         all_weeks=all_weeks,
         current_week=(season, week),
         last_collected_display=last_collected_display,

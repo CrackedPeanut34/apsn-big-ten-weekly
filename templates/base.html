@@ -13,8 +13,10 @@
 <header class="site-header">
   <div class="site-header-inner">
     <a class="brand" href="{{ asset_prefix }}index.html">
-      <img class="brand-logo" src="{{ asset_prefix }}assets/apsn-logo.png" alt="APSN">
-      <span class="brand-title">Big Ten Weekly</span>
+      <img class="brand-logo brand-logo-apsn" src="{{ asset_prefix }}assets/apsn-logo.png" alt="APSN">
+      <span class="brand-divider" aria-hidden="true"></span>
+      <img class="brand-logo brand-logo-bigten" src="{{ asset_prefix }}assets/big-ten-logo.svg" alt="Big Ten Conference">
+      <span class="brand-title">Weekly</span>
     </a>
     {% block week_switcher %}{% endblock %}
   </div>
