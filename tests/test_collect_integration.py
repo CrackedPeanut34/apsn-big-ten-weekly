@@ -180,6 +180,8 @@ def _lines():
             {"provider": "DraftKings", "spread": -9.5, "spreadOpen": -8.5,
              "overUnder": 52.0, "overUnderOpen": 51.0,
              "homeMoneyline": -420, "awayMoneyline": 340},
+            {"provider": "Bovada", "spread": -9.5, "spreadOpen": -8.5,
+             "overUnder": 52.0, "overUnderOpen": 51.0},  # no moneyline published
         ]},
     ]
 
@@ -266,7 +268,7 @@ def test_pregame_wp_backfills_margin_from_probability(fake_conn, mocked_cfbd):
 
 def test_lines_write_devigged_win_prob_and_signed_margin(fake_conn, mocked_cfbd):
     collect.run(YEAR, WEEK, "regular")
-    assert len(fake_conn.odds_inserted) == 2
+    assert len(fake_conn.odds_inserted) == 3
 
     row = next(o for o in fake_conn.odds_inserted if o["game_id"] == 1001)
     assert row["spread_home"] == -13.5
@@ -276,6 +278,17 @@ def test_lines_write_devigged_win_prob_and_signed_margin(fake_conn, mocked_cfbd)
     expected_wp_home, expected_wp_away = c.devig_moneylines(-650, 480)
     assert row["win_prob_home"] == pytest.approx(expected_wp_home)
     assert expected_wp_home + expected_wp_away == pytest.approx(1.0)
+
+
+def test_lines_without_a_moneyline_still_get_a_win_prob(fake_conn, mocked_cfbd):
+    # Bovada published a spread but no moneyline for game 1002 -- win_prob_home
+    # must still be filled in, derived from the spread the same way every
+    # power-rating model source's margin becomes a win probability.
+    collect.run(YEAR, WEEK, "regular")
+    row = next(o for o in fake_conn.odds_inserted
+               if o["game_id"] == 1002 and o["provider"] == "Bovada")
+    assert row["moneyline_home"] is None
+    assert row["win_prob_home"] == pytest.approx(c.win_prob_from_margin(9.5))
 
 
 def test_each_source_commits_independently_of_a_later_failure(fake_conn, mocked_cfbd):

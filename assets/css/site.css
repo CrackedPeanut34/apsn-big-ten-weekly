@@ -219,7 +219,7 @@ main {
   align-items: center;
   gap: 0.5rem;
   overflow-x: auto;
-  padding: 0.25rem 0.1rem 1rem;
+  padding: 0.25rem 1.25rem 1rem 0.1rem;
   margin-bottom: 0.5rem;
   border-bottom: 1px solid var(--border);
 }
@@ -288,12 +288,6 @@ main {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-
-.game-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 8px 20px rgba(28, 26, 22, 0.12), 0 2px 6px rgba(28, 26, 22, 0.08);
 }
 
 .top-matchup-badge {
@@ -464,16 +458,6 @@ main {
   padding: 0.35rem 0.5rem;
 }
 
-.table-section-note {
-  margin-left: 0.5rem;
-  color: var(--text-faint);
-  font-family: var(--font-body);
-  font-weight: 400;
-  font-size: 0.7rem;
-  text-transform: none;
-  letter-spacing: normal;
-}
-
 .model-table tbody tr:last-child td,
 .model-table tbody tr:last-child th {
   border-bottom: none;
@@ -599,6 +583,54 @@ main {
 
 .feedback-form button:hover {
   background: var(--red-text);
+}
+
+/* ---------- glossary ---------- */
+
+.glossary {
+  margin-top: 2.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.glossary h2 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.3rem;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  margin: 0 0 1rem;
+}
+
+.glossary-entry {
+  scroll-margin-top: 1rem;
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--border);
+}
+
+.glossary-entry:first-of-type {
+  border-top: none;
+}
+
+.glossary-entry h3 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  margin: 0 0 0.25rem;
+}
+
+.glossary-entry p {
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  margin: 0 0 0.4rem;
+}
+
+.glossary-entry a {
+  font-size: 0.85rem;
+  text-decoration: underline;
+  text-decoration-color: var(--text-faint);
 }
 
 /* ---------- footer ---------- */

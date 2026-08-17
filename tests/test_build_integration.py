@@ -36,9 +36,11 @@ GAME_ROW = {
 
 MODEL_SOURCES = [
     {"id": 1, "name": "SP+", "slug": "sp-plus", "homepage_url": "https://espn.com/sp",
-     "output_type": "power_rating", "hfa": Decimal("2.5"), "active": True},
+     "output_type": "power_rating", "hfa": Decimal("2.5"), "active": True,
+     "notes": "Test note for SP+."},
     {"id": 2, "name": "SRS", "slug": "srs", "homepage_url": "https://cfbd.com/srs",
-     "output_type": "power_rating", "hfa": Decimal("2.5"), "active": True},
+     "output_type": "power_rating", "hfa": Decimal("2.5"), "active": True,
+     "notes": "Test note for SRS."},
 ]
 
 # SP+ has a real row; SRS has none for this game -> must render as em dash.

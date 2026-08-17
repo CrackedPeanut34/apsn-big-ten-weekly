@@ -243,6 +243,12 @@ def parse_summary(game_id: int, season: int, week: int) -> dict | None:
 
 # --- assembly ------------------------------------------------------------
 
+def favored_team_abbr(margin_home: float | None, game: dict) -> str | None:
+    if margin_home is None or margin_home == 0:
+        return None
+    return game["home_abbr"] if margin_home > 0 else game["away_abbr"]
+
+
 def build_game_card(game: dict, predictions: list[dict], odds: list[dict],
                      season: int, week: int) -> dict:
     market_margin = market_avg_margin(odds)
@@ -254,7 +260,8 @@ def build_game_card(game: dict, predictions: list[dict], odds: list[dict],
         win_prob_home = float(pred["win_prob_home"]) if pred and pred["win_prob_home"] is not None else None
         model_rows.append({
             "name": source["name"],
-            "homepage_url": source["homepage_url"],
+            "slug": source["slug"],
+            "favored_abbr": favored_team_abbr(margin_home, game),
             "margin_display": em_dash_if_none(margin_home),
             "win_prob_display": em_dash_if_none(win_prob_home * 100 if win_prob_home is not None else None, "{:.0f}%"),
             "divergence": divergence_chip(margin_home, market_margin),
@@ -264,15 +271,9 @@ def build_game_card(game: dict, predictions: list[dict], odds: list[dict],
     for o in odds:
         margin_home = float(o["margin_home"]) if o["margin_home"] is not None else None
         win_prob_home = float(o["win_prob_home"]) if o["win_prob_home"] is not None else None
-        if margin_home is None or margin_home == 0:
-            favored_abbr = None
-        elif margin_home > 0:
-            favored_abbr = game["home_abbr"]
-        else:
-            favored_abbr = game["away_abbr"]
         market_rows.append({
             "provider": o["provider"],
-            "favored_abbr": favored_abbr,
+            "favored_abbr": favored_team_abbr(margin_home, game),
             "margin_display": em_dash_if_none(margin_home),
             "win_prob_display": em_dash_if_none(win_prob_home * 100 if win_prob_home is not None else None, "{:.0f}%"),
             "spread_home": o["spread_home"],
@@ -341,6 +342,10 @@ def render_week(conn, env: Environment, season: int, week: int, all_weeks: list[
     # with no FPI coverage on either side fall back to closest-market-line.
     cards.sort(key=lambda c: (c["avg_fpi"] is None, -(c["avg_fpi"] or 0), c["sort_key"]))
 
+    # Every game has the same set of active sources in the same order (see
+    # fetch_latest_predictions), so any one game's list defines the glossary.
+    glossary_sources = [entry["source"] for entry in predictions_by_game[games[0]["id"]]]
+
     template = env.get_template("week.html")
     html = template.render(
         asset_prefix="../",
@@ -348,6 +353,7 @@ def render_week(conn, env: Environment, season: int, week: int, all_weeks: list[
         week=week,
         cards=cards,
         teams=teams,
+        glossary_sources=glossary_sources,
         all_weeks=all_weeks,
         current_week=(season, week),
     )

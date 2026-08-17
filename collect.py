@@ -263,6 +263,13 @@ def collect_lines(conn, year: int, week: int, season_type: str) -> int:
                 win_prob_home = None
                 if ml_home is not None and ml_away is not None:
                     win_prob_home, _ = c.devig_moneylines(ml_home, ml_away)
+                elif margin_home is not None:
+                    # This provider didn't publish a moneyline for this game
+                    # (common for early-season lines). Same margin -> win
+                    # probability conversion already used for every power-
+                    # rating model source, so the column is never just
+                    # empty because one input was missing.
+                    win_prob_home = c.win_prob_from_margin(margin_home)
 
                 cur.execute(
                     """
