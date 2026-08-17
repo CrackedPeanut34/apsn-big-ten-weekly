@@ -46,21 +46,15 @@ Both scripts are safe to re-run. `collect.py` only ever inserts new
 `predictions`/`odds_snapshots` rows (append-only, by design -- see
 `conversions.py`'s module docstring) and upserts `teams`/`games`.
 
-## Before trusting the numbers: verify the spread sign convention
+## Spread sign convention
 
 `conversions.py` assumes CFBD's `/lines` `spread` field is home-team
-perspective (negative = home favored). That assumption was written without
-a live API key and is **not yet empirically confirmed** -- see the warning
-at the top of `conversions.py`. Once `CFBD_API_KEY` is set:
-
-```
-pytest tests/test_spread_sign_convention.py -v
-```
-
-This pulls real lines data and self-checks the sign against moneyline sign
-(unambiguous in American odds), rather than relying on a hardcoded game. It
-must pass before the site's model-vs-market comparisons can be trusted. It
-runs automatically in CI once `CFBD_API_KEY` is added as a repo secret.
+perspective (negative = home favored). **Confirmed against live data** by
+`tests/test_spread_sign_convention.py`, which cross-checks spread sign
+against moneyline sign (unambiguous in American odds) rather than relying
+on a hardcoded game. It runs automatically in CI now that `CFBD_API_KEY` is
+a repo secret -- if CFBD ever changes this behavior, that test is what
+catches it.
 
 ## Tests
 
@@ -97,10 +91,9 @@ renders; `generated_by: llm` gets a visible AI-generated label).
 
 ## Submission form
 
-`templates/week.html` has a Formspree form with a placeholder
-`action="https://formspree.io/f/YOUR_FORM_ID"`. Create a free form at
-formspree.io and replace `YOUR_FORM_ID` before launch, or it will 404 on
-submit.
+`templates/week.html` posts to a Formspree form (`formspree.io/f/mkjwqjqe`).
+Submissions show up in the Formspree dashboard under that account -- there's
+no database table wired up on purpose (see build brief section 10).
 
 ## Project layout
 
@@ -119,13 +112,32 @@ tests/                   50 tests, see "Tests" above
 .github/workflows/      deploy.yml (collect+build+deploy), test.yml (CI)
 ```
 
-## What's still manual before Week 1
+## Status
 
-- [ ] Get a real `CFBD_API_KEY` and confirm the spread sign convention test
-      passes (see above) -- this is the one thing that can silently invert
-      the whole site if skipped.
-- [ ] Create the Supabase project and set `DATABASE_URL`.
-- [ ] Push to GitHub, add both secrets, enable Pages (Actions source).
-- [ ] Create a Formspree form and swap in the real ID.
-- [ ] Write summaries for as many Week 1 games as time allows (optional --
-      a missing summary renders cleanly).
+Live at https://crackedpeanut34.github.io/apsn-big-ten-weekly/. CFBD key,
+Supabase DB, GitHub secrets, Pages, and the Formspree form are all wired up
+and confirmed working against real 2026 Week 1 data.
+
+Two things worth knowing, found while wiring this up for real:
+
+- Supabase's **direct** connection string (`db.<ref>.supabase.co`) resolves
+  to an IPv6-only address. That works from a machine with IPv6 (most home
+  ISPs) but not from GitHub Actions runners (`Network is unreachable`).
+  `DATABASE_URL` uses the **session pooler** string
+  (`aws-0-<region>.pooler.supabase.com:5432`, username
+  `postgres.<project-ref>`) instead, which supports IPv4 and works in both
+  places. If `DATABASE_URL` ever gets regenerated from Supabase, grab the
+  pooler variant, not the direct one.
+- Team refresh and the SRS/Elo/FPI rating pulls are intentionally *not*
+  filtered to `conference=B1G`. Nonconference opponents (FCS cupcakes,
+  other-conference teams) need a team row and a rating too, or the
+  home-minus-away margin calc has nothing to subtract and that model's row
+  silently em-dashes for every nonconference game. Only `/games`,
+  `/games/media`, and `/lines` stay conference-filtered, since those are
+  fetched per-game rather than per-team.
+
+Remaining, whenever there's time (none of it blocks the site working):
+- [ ] Write summaries for Week 1 games (optional -- a missing summary
+      renders cleanly, and it's ~9-18 files of manual writing either way).
+- [ ] Consider resetting the Supabase DB password, since it was pasted in
+      this chat session.
