@@ -38,6 +38,9 @@
   <div class="game-grid">
     {% for card in cards %}
     <article class="game-card" id="game-{{ card.id }}" data-teams="{{ card.home_school }}|{{ card.away_school }}">
+      {% if loop.first and card.avg_fpi is not none %}
+      <div class="top-matchup-badge"><span>Top matchup</span></div>
+      {% endif %}
       <header class="game-card-header">
         <div class="matchup">
           <div class="team team-away">

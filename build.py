@@ -205,6 +205,17 @@ def em_dash_if_none(value, fmt: str = "{:.1f}") -> str:
     return fmt.format(float(value))
 
 
+def extract_fpi(predictions: list[dict]) -> tuple[float, float] | None:
+    """Each team's own FPI rating for this game, read back out of the FPI
+    model's raw_payload (raw_value on that row is home - away, not useful
+    here). None if this game has no FPI coverage (e.g. an FCS opponent)."""
+    for entry in predictions:
+        if entry["source"]["slug"] == "fpi" and entry["prediction"] is not None:
+            payload = entry["prediction"]["raw_payload"]
+            return float(payload["home"]["fpi"]), float(payload["away"]["fpi"])
+    return None
+
+
 def eastern_kickoff(value) -> str:
     if value is None:
         return "TBD"
@@ -274,6 +285,10 @@ def build_game_card(game: dict, predictions: list[dict], odds: list[dict],
 
     summary = parse_summary(game["id"], season, week)
 
+    fpi = extract_fpi(predictions)
+    home_fpi, away_fpi = fpi if fpi else (None, None)
+    avg_fpi = (home_fpi + away_fpi) / 2 if fpi else None
+
     return {
         "id": game["id"],
         "start_date": game["start_date"],
@@ -282,13 +297,14 @@ def build_game_card(game: dict, predictions: list[dict], odds: list[dict],
         "venue": game["venue"],
         "home_school": game["home_school"], "home_abbr": game["home_abbr"],
         "home_logo_url": game["home_logo_url"], "home_logo_dark_url": game["home_logo_dark_url"],
-        "home_color": game["home_color"],
+        "home_color": game["home_color"], "home_fpi": home_fpi,
         "away_school": game["away_school"], "away_abbr": game["away_abbr"],
         "away_logo_url": game["away_logo_url"], "away_logo_dark_url": game["away_logo_dark_url"],
-        "away_color": game["away_color"],
+        "away_color": game["away_color"], "away_fpi": away_fpi,
         "model_rows": model_rows,
         "market_rows": market_rows,
         "sort_key": market_closeness_key(odds),
+        "avg_fpi": avg_fpi,
         "summary": summary,
     }
 
@@ -308,18 +324,26 @@ def render_week(conn, env: Environment, season: int, week: int, all_weeks: list[
         build_game_card(g, predictions_by_game[g["id"]], odds_by_game[g["id"]], season, week)
         for g in games
     ]
-    cards.sort(key=lambda c: c["sort_key"])
 
     teams_seen = {}
-    for g in games:
+    for g, c in zip(games, cards):
         for prefix in ("home", "away"):
             # teams.conference stores CFBD's display name ("Big Ten"), not
             # the "B1G" query-filter code config.CONFERENCE holds.
             if g[f"{prefix}_conference"] != "Big Ten":
                 continue
             school = g[f"{prefix}_school"]
-            teams_seen.setdefault(school, {"school": school, "logo_url": g[f"{prefix}_logo_url"]})
-    teams = sorted(teams_seen.values(), key=lambda t: t["school"])
+            teams_seen.setdefault(school, {
+                "school": school,
+                "logo_url": g[f"{prefix}_logo_url"],
+                "fpi": c[f"{prefix}_fpi"],
+            })
+    # Highest FPI first; teams with no FPI coverage sort last, alphabetically.
+    teams = sorted(teams_seen.values(), key=lambda t: (t["fpi"] is None, -(t["fpi"] or 0), t["school"]))
+
+    # Highest combined FPI first (marquee matchups float to the top); games
+    # with no FPI coverage on either side fall back to closest-market-line.
+    cards.sort(key=lambda c: (c["avg_fpi"] is None, -(c["avg_fpi"] or 0), c["sort_key"]))
 
     last_collected_display = None
     if last_collected is not None:

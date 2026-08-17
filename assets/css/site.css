@@ -38,7 +38,9 @@ html {
 
 body {
   margin: 0;
-  background: var(--bg);
+  background-color: var(--bg);
+  background-image: radial-gradient(circle, rgba(28, 26, 22, 0.05) 1px, transparent 1px);
+  background-size: 20px 20px;
   color: var(--text);
   font-family: var(--font-body);
   font-size: 16px;
@@ -233,14 +235,14 @@ main {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 2.5rem;
-  height: 2.5rem;
-  padding: 0.35rem;
+  width: 3.75rem;
+  height: 3.75rem;
+  padding: 0.5rem;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: 999px;
   cursor: pointer;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
 }
 
 .team-filter-chip img {
@@ -251,6 +253,7 @@ main {
 
 .team-filter-chip:hover {
   border-color: var(--text-faint);
+  transform: translateY(-2px);
 }
 
 .team-filter-chip.is-active {
@@ -260,7 +263,6 @@ main {
 
 .team-filter-chip[data-team-filter='all'] {
   width: auto;
-  height: 2.5rem;
   border-radius: var(--radius-sm);
   padding: 0 0.85rem;
   font-family: var(--font-display);
@@ -309,6 +311,31 @@ main {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.game-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(28, 26, 22, 0.12), 0 2px 6px rgba(28, 26, 22, 0.08);
+}
+
+.top-matchup-badge {
+  display: inline-block;
+  align-self: flex-start;
+  padding: 0.15rem 0.55rem;
+  background: var(--red);
+  color: #fff;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  transform: skewX(var(--skew));
+}
+
+.top-matchup-badge span {
+  display: inline-block;
+  transform: skewX(calc(-1 * var(--skew)));
 }
 
 .game-card-header {
