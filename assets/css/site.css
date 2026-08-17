@@ -691,6 +691,7 @@ main {
 .rankings-table td {
   padding: 0.55rem 0.75rem;
   text-align: left;
+  vertical-align: top;
   border-bottom: 1px solid var(--border);
 }
 
