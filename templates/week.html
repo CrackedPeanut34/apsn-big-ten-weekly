@@ -140,7 +140,8 @@
     {% for s in glossary_sources %}
     <div class="glossary-entry" id="glossary-{{ s.slug }}">
       <h3>{{ s.name }}</h3>
-      {% if s.notes %}<p>{{ s.notes }}</p>{% endif %}
+      {% if s.description %}<p>{{ s.description }}</p>{% endif %}
+      {% if s.notes %}<p class="glossary-note">How we use it here: {{ s.notes }}</p>{% endif %}
       <a href="{{ s.homepage_url }}" rel="noopener">Source &rarr;</a>
     </div>
     {% endfor %}

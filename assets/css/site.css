@@ -39,8 +39,10 @@ html {
 body {
   margin: 0;
   background-color: var(--bg);
-  background-image: radial-gradient(circle, rgba(28, 26, 22, 0.05) 1px, transparent 1px);
-  background-size: 20px 20px;
+  background-image:
+    radial-gradient(circle, rgba(28, 26, 22, 0.05) 1px, transparent 1px),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cline x1='0' y1='0.5' x2='120' y2='0.5' stroke='%23cd242e' stroke-opacity='0.05' stroke-width='1'/%3E%3Cline x1='30' y1='55' x2='38' y2='55' stroke='%231c1a16' stroke-opacity='0.05' stroke-width='2'/%3E%3Cline x1='82' y1='55' x2='90' y2='55' stroke='%231c1a16' stroke-opacity='0.05' stroke-width='2'/%3E%3Cline x1='30' y1='65' x2='38' y2='65' stroke='%231c1a16' stroke-opacity='0.05' stroke-width='2'/%3E%3Cline x1='82' y1='65' x2='90' y2='65' stroke='%231c1a16' stroke-opacity='0.05' stroke-width='2'/%3E%3C/svg%3E");
+  background-size: 20px 20px, 120px 120px;
   color: var(--text);
   font-family: var(--font-body);
   font-size: 16px;
@@ -625,6 +627,12 @@ main {
   color: var(--text-dim);
   font-size: 0.9rem;
   margin: 0 0 0.4rem;
+}
+
+.glossary-note {
+  color: var(--text-faint);
+  font-size: 0.8rem;
+  font-style: italic;
 }
 
 .glossary-entry a {

@@ -36,6 +36,53 @@ EASTERN = ZoneInfo("America/New_York")
 # after these, alphabetically among themselves.
 PROVIDER_ORDER = {"DraftKings": 0, "FanDuel": 1, "Bovada": 2}
 
+# Who makes each model, what it's built from, and how it differs from the
+# others -- keyed by model_sources.slug. Separate from model_sources.notes,
+# which stays focused on this project's own conversion caveats (e.g. HFA).
+GLOSSARY_DESCRIPTIONS = {
+    "sp-plus": (
+        "Built by Bill Connelly, a college football analyst at ESPN (he "
+        "created it in 2008 at Football Outsiders, before joining ESPN in "
+        "2019). It's a tempo- and opponent-adjusted efficiency rating "
+        "pulled from play-by-play data -- success rate and explosiveness "
+        "on a per-play basis -- rather than just final scores. It's meant "
+        "to predict how a team will play going forward, not to reward past "
+        "results."
+    ),
+    "srs": (
+        "Simple Rating System, originally devised by Doug Drinen at "
+        "Pro-Football-Reference; CollegeFootballData runs the college "
+        "football version. It's the simplest model on this page: a system "
+        "of equations solved so each team's rating equals its average "
+        "scoring margin, adjusted for opponents' ratings. No play-by-play "
+        "or efficiency data, just final scores."
+    ),
+    "elo": (
+        "Adapted from the rating system physicist Arpad Elo devised for "
+        "chess; CollegeFootballData runs the college football version. "
+        "Unlike the others here, it isn't recalculated fresh each week -- "
+        "it's a running rating that shifts after every game based on the "
+        "result and the pre-game rating gap, carrying over between seasons "
+        "with some regression toward the mean."
+    ),
+    "fpi": (
+        "ESPN's Football Power Index -- built independently of SP+ despite "
+        "both being ESPN products. Combines separately modeled offense, "
+        "defense, and special-teams components grounded in EPA (expected "
+        "points added) with preseason inputs like returning production, "
+        "recruiting, and coaching tenure, then simulates the rest of the "
+        "season thousands of times."
+    ),
+    "cfbd-pregame-wp": (
+        "CollegeFootballData's own machine learning model (gradient-"
+        "boosted trees via XGBoost), trained directly on historical game "
+        "outcomes using features like team ratings, rankings, recruiting, "
+        "and home/neutral-site status. It's the only source here whose "
+        "native output is already a win probability -- this page's margin "
+        "column is back-derived from it, not the other way around."
+    ),
+}
+
 
 def log(msg: str) -> None:
     print(f"[build] {msg}", flush=True)
@@ -344,7 +391,10 @@ def render_week(conn, env: Environment, season: int, week: int, all_weeks: list[
 
     # Every game has the same set of active sources in the same order (see
     # fetch_latest_predictions), so any one game's list defines the glossary.
-    glossary_sources = [entry["source"] for entry in predictions_by_game[games[0]["id"]]]
+    glossary_sources = [
+        {**entry["source"], "description": GLOSSARY_DESCRIPTIONS.get(entry["source"]["slug"])}
+        for entry in predictions_by_game[games[0]["id"]]
+    ]
 
     template = env.get_template("week.html")
     html = template.render(
