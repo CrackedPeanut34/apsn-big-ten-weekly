@@ -1,20 +1,23 @@
 {% extends "base.html" %}
 
-{% block title %}Rankings &mdash; APSN Big Ten Weekly{% endblock %}
+{% block title %}Rankings, Week {{ week }} &mdash; APSN Big Ten Weekly{% endblock %}
 
 {% block week_switcher %}{% include "_nav.html" %}{% endblock %}
 
 {% block content %}
 <div class="week-page">
   <div class="week-heading">
-    <h1>Rankings</h1>
+    <h1>Rankings <span class="rankings-week-label">Week {{ week }}</span></h1>
   </div>
 
   <p class="rankings-intro">
     Every Big Ten team's record and current rating from each source, side
-    by side -- never averaged into one number. Sorted by FPI by default;
-    click any column to sort by it instead, click again to flip direction.
-    Teams a source hasn't rated yet sort to the bottom.
+    by side -- never averaged into one number. National rank (out of every
+    FBS team, not just Big Ten) shown next to each rating; AP Top 25 rank
+    shown next to the team name. Sorted by FPI by default; click any column
+    to sort by it instead, click again to flip direction. Teams a source
+    hasn't rated yet sort to the bottom. This is Week {{ week }}'s snapshot
+    -- it won't change after the fact, even once later weeks are added.
   </p>
 
   <div class="table-scroll">
@@ -36,6 +39,7 @@
           <th scope="row" data-sort-cell="school">
             <img class="team-logo-sm" src="{{ t.logo_url or '' }}" alt="" loading="lazy">
             {{ t.school }}
+            {% if t.ap_rank %}<span class="ap-rank-badge">AP {{ t.ap_rank }}</span>{% endif %}
           </th>
           <td class="num tabular" data-sort-cell="record" data-value="{{ '' if t.record_value is none else t.record_value }}">
             {{ t.record_display }}
@@ -43,6 +47,7 @@
           {% for cell in t.cells %}
           <td class="num tabular" data-sort-cell="{{ cell.slug }}" data-value="{{ '' if cell.value is none else cell.value }}">
             {{ cell.display }}
+            {% if cell.national_rank %}<span class="national-rank">No. {{ cell.national_rank }}</span>{% endif %}
           </td>
           {% endfor %}
         </tr>

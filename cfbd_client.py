@@ -106,3 +106,10 @@ def get_fpi(year: int, conference: str | None = None) -> list[dict]:
 
 def get_pregame_wp(year: int, week: int, season_type: str = "regular") -> list[dict]:
     return _get("/metrics/wp/pregame", {"year": year, "week": week, "seasonType": season_type})
+
+
+def get_rankings(year: int, week: int, season_type: str = "regular") -> list[dict]:
+    """Every poll CFBD tracks (AP Top 25, Coaches Poll, FCS/D-II/D-III
+    polls...) for one week. Shape: [{season, week, seasonType,
+    polls: [{poll, ranks: [{rank, school, points, firstPlaceVotes, ...}]}]}]."""
+    return _get("/rankings", {"year": year, "week": week, "seasonType": season_type})

@@ -242,11 +242,34 @@ def fetch_team_records(conn, season: int) -> dict[int, tuple[int, int]]:
         return {row["team_id"]: (row["wins"], row["losses"]) for row in cur.fetchall()}
 
 
-def fetch_team_ratings(conn, season: int) -> tuple[list[dict], list[dict]]:
-    """Latest team_ratings row per (team, model_source) for every Big Ten
-    team, for every active power-rating source. CFBD Pregame Win Probability
-    is excluded -- it isn't a standalone team rating, it's a per-game output
-    (see build_game_card's model_rows for that one instead)."""
+def compute_national_ranks(latest: list[dict]) -> dict[tuple[int, int], int]:
+    """Rank every team a source has a rating for (all FBS, not just Big
+    Ten) against each other, per source. Ties share a rank (1, 2, 2, 4...),
+    same convention AP/Coaches polls use. Keyed by (team_id, model_source_id)."""
+    by_source: dict[int, list[tuple[int, float]]] = {}
+    for r in latest:
+        by_source.setdefault(r["model_source_id"], []).append(
+            (r["team_id"], float(r["raw_value"]))
+        )
+
+    national_rank: dict[tuple[int, int], int] = {}
+    for source_id, team_values in by_source.items():
+        team_values.sort(key=lambda tv: tv[1], reverse=True)
+        prev_value, prev_rank = None, 0
+        for i, (team_id, value) in enumerate(team_values, start=1):
+            rank = i if value != prev_value else prev_rank
+            national_rank[(team_id, source_id)] = rank
+            prev_value, prev_rank = value, rank
+    return national_rank
+
+
+def fetch_team_ratings(conn, season: int, week: int) -> tuple[list[dict], list[dict]]:
+    """Every Big Ten team's rating from every active power-rating source, as
+    of one specific week -- pinned there forever by week (0004_week_scoped_
+    rankings.sql), same as a game's odds/predictions never drift once
+    collected. CFBD Pregame Win Probability is excluded -- it isn't a
+    standalone team rating, it's a per-game output (see build_game_card's
+    model_rows for that one instead)."""
     with conn.cursor() as cur:
         cur.execute(
             "SELECT * FROM model_sources WHERE active = TRUE AND output_type = 'power_rating' ORDER BY id"
@@ -256,24 +279,41 @@ def fetch_team_ratings(conn, season: int) -> tuple[list[dict], list[dict]]:
         cur.execute(
             "SELECT id, school, logo_url FROM teams WHERE conference = 'Big Ten' ORDER BY school"
         )
-        teams = cur.fetchall()
+        big_ten_teams = cur.fetchall()
 
+        # Latest row per (team, source) as of this week specifically -- not
+        # "latest ever", so this never changes once a later week exists.
+        # Deliberately not conference-filtered: national rank needs every
+        # FBS team's rating, not just Big Ten's.
         cur.execute(
             """
             SELECT DISTINCT ON (tr.team_id, tr.model_source_id)
                    tr.*
             FROM team_ratings tr
-            WHERE tr.season = %(season)s
+            WHERE tr.season = %(season)s AND tr.week = %(week)s
             ORDER BY tr.team_id, tr.model_source_id, tr.collected_at DESC
             """,
-            {"season": season},
+            {"season": season, "week": week},
         )
         latest = cur.fetchall()
 
+        cur.execute(
+            """
+            SELECT DISTINCT ON (pr.team_id)
+                   pr.team_id, pr.poll_rank
+            FROM poll_rankings pr
+            WHERE pr.season = %(season)s AND pr.week = %(week)s AND pr.poll = %(poll)s
+            ORDER BY pr.team_id, pr.collected_at DESC
+            """,
+            {"season": season, "week": week, "poll": "AP Top 25"},
+        )
+        ap_rank_by_team = {row["team_id"]: row["poll_rank"] for row in cur.fetchall()}
+
+    national_rank = compute_national_ranks(latest)
     records = fetch_team_records(conn, season)
     by_team_and_source = {(r["team_id"], r["model_source_id"]): r for r in latest}
     rows = []
-    for team in teams:
+    for team in big_ten_teams:
         wins, losses = records.get(team["id"], (0, 0))
         cells = []
         for source in sources:
@@ -284,12 +324,14 @@ def fetch_team_ratings(conn, season: int) -> tuple[list[dict], list[dict]]:
                 "slug": source["slug"],
                 "value": value,
                 "display": fmt.format(value) if value is not None else "—",
+                "national_rank": national_rank.get((team["id"], source["id"])),
             })
         rows.append({
             "school": team["school"],
             "logo_url": team["logo_url"],
             "record_display": f"{wins}-{losses}",
             "record_value": wins / (wins + losses) if (wins + losses) > 0 else None,
+            "ap_rank": ap_rank_by_team.get(team["id"]),
             "cells": cells,
         })
     return rows, sources
@@ -495,6 +537,7 @@ def render_week(conn, env: Environment, season: int, week: int, all_weeks: list[
         glossary_sources=glossary_sources,
         all_weeks=all_weeks,
         current_week=(season, week),
+        is_rankings=False,
     )
 
     out_dir = SITE_DIR / str(season)
@@ -504,8 +547,8 @@ def render_week(conn, env: Environment, season: int, week: int, all_weeks: list[
     log(f"wrote {os.path.relpath(out_path, ROOT)} ({len(cards)} games)")
 
 
-def render_rankings(conn, env: Environment, season: int, all_weeks: list[tuple[int, int]]) -> None:
-    teams, sources = fetch_team_ratings(conn, season)
+def render_rankings(conn, env: Environment, season: int, week: int, all_weeks: list[tuple[int, int]]) -> None:
+    teams, sources = fetch_team_ratings(conn, season, week)
 
     glossary_sources = [
         {**s, "description": GLOSSARY_DESCRIPTIONS.get(s["slug"])} for s in sources
@@ -524,16 +567,18 @@ def render_rankings(conn, env: Environment, season: int, all_weeks: list[tuple[i
     html = template.render(
         asset_prefix="../",
         season=season,
+        week=week,
         teams=teams,
         sources=sources,
         glossary_sources=glossary_sources,
         all_weeks=all_weeks,
-        current_week=None,
+        current_week=(season, week),
+        is_rankings=True,
     )
 
     out_dir = SITE_DIR / str(season)
     out_dir.mkdir(parents=True, exist_ok=True)
-    out_path = out_dir / "rankings.html"
+    out_path = out_dir / f"rankings-week-{week:02d}.html"
     out_path.write_text(html)
     log(f"wrote {os.path.relpath(out_path, ROOT)} ({len(teams)} teams, {len(sources)} sources)")
 
@@ -583,9 +628,7 @@ def main() -> int:
 
         for season, week in targets:
             render_week(conn, env, season, week, all_weeks)
-
-        for season in sorted({s for s, _ in targets}):
-            render_rankings(conn, env, season, all_weeks)
+            render_rankings(conn, env, season, week, all_weeks)
 
         default_season, default_week = targets[-1] if not args.all_weeks else determine_default_week(conn)
         render_index(env, default_season, default_week)

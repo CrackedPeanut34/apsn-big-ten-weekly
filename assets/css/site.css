@@ -216,6 +216,13 @@ main {
   margin: 0 0 0.25rem;
 }
 
+.rankings-week-label {
+  color: var(--text-dim);
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
 .team-filter {
   display: flex;
   align-items: center;
@@ -721,6 +728,27 @@ main {
   height: 1.4rem;
   object-fit: contain;
   flex: none;
+}
+
+.ap-rank-badge {
+  display: inline-block;
+  padding: 0.05rem 0.4rem;
+  background: var(--red);
+  color: #fff;
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 0.65rem;
+  letter-spacing: 0.03em;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+}
+
+.national-rank {
+  display: block;
+  color: var(--text-faint);
+  font-weight: 400;
+  font-size: 0.7rem;
+  white-space: nowrap;
 }
 
 .rankings-table tbody tr:last-child th,

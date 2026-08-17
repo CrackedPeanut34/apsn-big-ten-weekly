@@ -67,15 +67,23 @@ TEAMS = [
 # the rankings page too, same as it does per-game. Indiana's FPI (5.0) is
 # lower than Ohio State's (20.0) despite sorting first alphabetically, so
 # the default-sort tests can tell "sorted by FPI" apart from "alphabetical".
+# Both rows also double as the full national pool (no other teams exist in
+# this fixture), so Ohio State is nationally No. 1 and Indiana No. 2 on
+# both SP+ and FPI.
 TEAM_RATINGS = [
-    {"team_id": 1, "model_source_id": 1, "raw_value": Decimal("25.0"),
+    {"team_id": 1, "model_source_id": 1, "raw_value": Decimal("25.0"), "week": WEEK,
      "collected_at": dt.datetime(2026, 8, 27, 10, 0, tzinfo=dt.timezone.utc)},
-    {"team_id": 2, "model_source_id": 1, "raw_value": Decimal("10.0"),
+    {"team_id": 2, "model_source_id": 1, "raw_value": Decimal("10.0"), "week": WEEK,
      "collected_at": dt.datetime(2026, 8, 27, 10, 0, tzinfo=dt.timezone.utc)},
-    {"team_id": 1, "model_source_id": 3, "raw_value": Decimal("20.0"),
+    {"team_id": 1, "model_source_id": 3, "raw_value": Decimal("20.0"), "week": WEEK,
      "collected_at": dt.datetime(2026, 8, 27, 10, 0, tzinfo=dt.timezone.utc)},
-    {"team_id": 2, "model_source_id": 3, "raw_value": Decimal("5.0"),
+    {"team_id": 2, "model_source_id": 3, "raw_value": Decimal("5.0"), "week": WEEK,
      "collected_at": dt.datetime(2026, 8, 27, 10, 0, tzinfo=dt.timezone.utc)},
+]
+
+# Ohio State is AP-ranked, Indiana isn't (unranked -> no poll_rankings row).
+AP_RANKINGS = [
+    {"team_id": 1, "poll_rank": 3},
 ]
 
 
@@ -111,6 +119,8 @@ class FakeCursor:
             self._result = ("all", TEAMS)
         elif "FROM team_ratings tr" in n:
             self._result = ("all", TEAM_RATINGS)
+        elif "FROM poll_rankings pr" in n:
+            self._result = ("all", AP_RANKINGS)
         elif "GROUP BY t.id" in n:
             # GAME_ROW is unplayed (points still None) -> both teams 0-0.
             self._result = ("all", [{"team_id": 1, "wins": 0, "losses": 0},
@@ -200,17 +210,21 @@ def test_index_redirects_to_the_built_week(wired, monkeypatch):
     assert f"{SEASON}/week-{WEEK:02d}.html" in index_html
 
 
+RANKINGS_FILENAME = f"rankings-week-{WEEK:02d}.html"
+
+
 def test_rankings_page_written_with_both_teams_and_sources(wired, monkeypatch):
     monkeypatch.setattr("sys.argv", ["build.py"])
     exit_code = build.main()
     assert exit_code == 0
 
-    rankings_page = wired / "site" / str(SEASON) / "rankings.html"
+    rankings_page = wired / "site" / str(SEASON) / RANKINGS_FILENAME
     assert rankings_page.exists()
     html = rankings_page.read_text()
     assert "Ohio State" in html
     assert "Indiana" in html
     assert "SP+" in html
+    assert f"Week {WEEK}" in html
 
 
 def test_rankings_page_em_dashes_a_source_with_no_team_rating(wired, monkeypatch):
@@ -218,7 +232,7 @@ def test_rankings_page_em_dashes_a_source_with_no_team_rating(wired, monkeypatch
     # silently drop its column or show a bare 0.
     monkeypatch.setattr("sys.argv", ["build.py"])
     build.main()
-    html = (wired / "site" / str(SEASON) / "rankings.html").read_text()
+    html = (wired / "site" / str(SEASON) / RANKINGS_FILENAME).read_text()
     srs_cell_start = html.index('data-sort-cell="srs"')
     assert "—" in html[srs_cell_start:srs_cell_start + 150]
 
@@ -228,7 +242,7 @@ def test_rankings_page_sorted_by_fpi_not_alphabetically(wired, monkeypatch):
     # even though "Indiana" sorts first alphabetically.
     monkeypatch.setattr("sys.argv", ["build.py"])
     build.main()
-    html = (wired / "site" / str(SEASON) / "rankings.html").read_text()
+    html = (wired / "site" / str(SEASON) / RANKINGS_FILENAME).read_text()
     assert html.index("Ohio State") < html.index("Indiana")
 
 
@@ -236,13 +250,24 @@ def test_rankings_page_shows_win_loss_record(wired, monkeypatch):
     # GAME_ROW hasn't been played (points still None) -> both teams 0-0.
     monkeypatch.setattr("sys.argv", ["build.py"])
     build.main()
-    html = (wired / "site" / str(SEASON) / "rankings.html").read_text()
+    html = (wired / "site" / str(SEASON) / RANKINGS_FILENAME).read_text()
     assert "Record" in html
     assert "0-0" in html
+
+
+def test_rankings_page_shows_national_rank_and_ap_badge(wired, monkeypatch):
+    # Ohio State (25.0) beats Indiana (10.0) on SP+, and only these two
+    # teams exist in the fixture -- so Ohio State is nationally No. 1.
+    # Ohio State is also the only AP-ranked team in the fixture (No. 3).
+    monkeypatch.setattr("sys.argv", ["build.py"])
+    build.main()
+    html = (wired / "site" / str(SEASON) / RANKINGS_FILENAME).read_text()
+    assert "No. 1" in html
+    assert "AP 3" in html
 
 
 def test_rankings_nav_link_appears_on_week_page(wired, monkeypatch):
     monkeypatch.setattr("sys.argv", ["build.py"])
     build.main()
     html = (wired / "site" / str(SEASON) / f"week-{WEEK:02d}.html").read_text()
-    assert f'href="../{SEASON}/rankings.html"' in html
+    assert f'href="../{SEASON}/{RANKINGS_FILENAME}"' in html

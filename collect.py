@@ -211,11 +211,13 @@ def collect_power_rating_source(conn, source: dict, games: list[dict], ratings: 
     return rows
 
 
-def collect_team_ratings(conn, source: dict, ratings: list[dict], season: int,
+def collect_team_ratings(conn, source: dict, ratings: list[dict], season: int, week: int,
                           team_key: str = "team", rating_key: str = "rating") -> int:
     """Every team a source rates, independent of who they're playing this
     week -- see 0003_team_ratings.sql for why collect_power_rating_source's
-    per-game rows aren't enough on their own."""
+    per-game rows aren't enough on their own. Tagged with the collection
+    week (0004_week_scoped_rankings.sql) so this week's rankings snapshot
+    is pinned and never redrawn once a later week has its own rows."""
     with conn.cursor() as cur:
         cur.execute("SELECT id, school FROM teams")
         team_id_by_school = {row["school"]: row["id"] for row in cur.fetchall()}
@@ -227,21 +229,67 @@ def collect_team_ratings(conn, source: dict, ratings: list[dict], season: int,
                 continue  # team not upserted yet -- refresh_teams_if_stale will catch it next run
             cur.execute(
                 """
-                INSERT INTO team_ratings (team_id, model_source_id, season, collected_at,
+                INSERT INTO team_ratings (team_id, model_source_id, season, week, collected_at,
                                            raw_value, raw_payload, conversion_version)
-                VALUES (%(team_id)s, %(model_source_id)s, %(season)s, now(),
+                VALUES (%(team_id)s, %(model_source_id)s, %(season)s, %(week)s, now(),
                         %(raw_value)s, %(raw_payload)s, %(conversion_version)s)
                 """,
                 {
                     "team_id": team_id,
                     "model_source_id": source["id"],
                     "season": season,
+                    "week": week,
                     "raw_value": r[rating_key],
                     "raw_payload": json.dumps(r),
                     "conversion_version": c.CONVERSION_VERSION,
                 },
             )
             rows += 1
+    conn.commit()
+    return rows
+
+
+AP_POLL_NAME = "AP Top 25"
+
+
+def collect_poll_rankings(conn, year: int, week: int, season_type: str = "regular") -> int:
+    """AP Top 25 only, out of the handful of polls CFBD returns (Coaches,
+    FCS/D-II/D-III polls too) -- that's the one that was asked for. Same
+    week-pinning as team_ratings: append-only, tagged with this week."""
+    entries = cfbd_client.get_rankings(year=year, week=week, season_type=season_type)
+    with conn.cursor() as cur:
+        cur.execute("SELECT id, school FROM teams")
+        team_id_by_school = {row["school"]: row["id"] for row in cur.fetchall()}
+
+        rows = 0
+        for entry in entries:
+            if entry.get("week") != week:
+                continue
+            for poll in entry.get("polls", []):
+                if poll["poll"] != AP_POLL_NAME:
+                    continue
+                for r in poll["ranks"]:
+                    team_id = team_id_by_school.get(r["school"])
+                    if team_id is None:
+                        continue
+                    cur.execute(
+                        """
+                        INSERT INTO poll_rankings (team_id, season, week, poll, poll_rank,
+                                                    points, first_place_votes, collected_at)
+                        VALUES (%(team_id)s, %(season)s, %(week)s, %(poll)s, %(poll_rank)s,
+                                %(points)s, %(first_place_votes)s, now())
+                        """,
+                        {
+                            "team_id": team_id,
+                            "season": year,
+                            "week": week,
+                            "poll": poll["poll"],
+                            "poll_rank": r["rank"],
+                            "points": r.get("points"),
+                            "first_place_votes": r.get("firstPlaceVotes"),
+                        },
+                    )
+                    rows += 1
     conn.commit()
     return rows
 
@@ -370,22 +418,22 @@ def run(year: int, week: int, season_type: str = "regular") -> int:
             if source["slug"] == "sp-plus":
                 ratings = cfbd_client.get_sp(year=year)
                 rows = collect_power_rating_source(conn, source, games, ratings)
-                rows += collect_team_ratings(conn, source, ratings, year)
+                rows += collect_team_ratings(conn, source, ratings, year, week)
             elif source["slug"] == "srs":
                 # Not conference-filtered: nonconference opponents need a
                 # rating too, or the home-minus-away differential can never
                 # be computed (see the same fix on teams/games above).
                 ratings = cfbd_client.get_srs(year=year)
                 rows = collect_power_rating_source(conn, source, games, ratings)
-                rows += collect_team_ratings(conn, source, ratings, year)
+                rows += collect_team_ratings(conn, source, ratings, year, week)
             elif source["slug"] == "elo":
                 ratings = cfbd_client.get_elo(year=year, week=week)
                 rows = collect_power_rating_source(conn, source, games, ratings, rating_key="elo")
-                rows += collect_team_ratings(conn, source, ratings, year, rating_key="elo")
+                rows += collect_team_ratings(conn, source, ratings, year, week, rating_key="elo")
             elif source["slug"] == "fpi":
                 ratings = cfbd_client.get_fpi(year=year)
                 rows = collect_power_rating_source(conn, source, games, ratings, rating_key="fpi")
-                rows += collect_team_ratings(conn, source, ratings, year, rating_key="fpi")
+                rows += collect_team_ratings(conn, source, ratings, year, week, rating_key="fpi")
             elif source["slug"] == "cfbd-pregame-wp":
                 wp_rows = cfbd_client.get_pregame_wp(year=year, week=week, season_type=season_type)
                 rows = collect_pregame_wp_source(conn, source, games, wp_rows)
@@ -411,6 +459,17 @@ def run(year: int, week: int, season_type: str = "regular") -> int:
         conn.rollback()
         log(f"FAILED lines: {e}")
         failed.append("lines")
+
+    attempted += 1
+    try:
+        rows = collect_poll_rankings(conn, year, week, season_type)
+        log(f"ap-poll: wrote {rows} rows")
+        total_rows += rows
+        succeeded += 1
+    except Exception as e:
+        conn.rollback()
+        log(f"FAILED ap-poll: {e}")
+        failed.append("ap-poll")
 
     conn.close()
 

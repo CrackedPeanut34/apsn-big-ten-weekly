@@ -107,6 +107,9 @@ class FakeCursor:
         elif normalized.startswith("INSERT INTO team_ratings"):
             self.conn.team_ratings_inserted.append(params)
             self._last_result = None
+        elif normalized.startswith("INSERT INTO poll_rankings"):
+            self.conn.poll_rankings_inserted.append(params)
+            self._last_result = None
         else:
             raise AssertionError(f"unexpected SQL in fake cursor: {normalized[:80]}")
 
@@ -129,6 +132,7 @@ class FakeConnection:
         self.predictions_inserted = []
         self.odds_inserted = []
         self.team_ratings_inserted = []
+        self.poll_rankings_inserted = []
         self.commits = 0
         self.rollbacks = 0
 
@@ -175,6 +179,20 @@ def _pregame_wp():
     ]
 
 
+def _rankings():
+    return [
+        {"season": YEAR, "seasonType": "regular", "week": WEEK, "polls": [
+            {"poll": "Coaches Poll", "ranks": [
+                {"rank": 1, "school": "Ohio State", "points": 1600, "firstPlaceVotes": 30},
+            ]},
+            {"poll": "AP Top 25", "ranks": [
+                {"rank": 2, "school": "Ohio State", "points": 1550, "firstPlaceVotes": 20},
+                {"rank": 15, "school": "Indiana", "points": 800, "firstPlaceVotes": 0},
+            ]},
+        ]},
+    ]
+
+
 def _lines():
     return [
         {"id": 1001, "homeTeam": "Ohio State", "awayTeam": "Indiana", "lines": [
@@ -214,6 +232,7 @@ def mocked_cfbd(monkeypatch):
     monkeypatch.setattr(cfbd_client, "get_fpi", lambda **kw: _fpi_ratings())
     monkeypatch.setattr(cfbd_client, "get_pregame_wp", lambda **kw: _pregame_wp())
     monkeypatch.setattr(cfbd_client, "get_lines", lambda **kw: _lines())
+    monkeypatch.setattr(cfbd_client, "get_rankings", lambda **kw: _rankings())
 
 
 def test_one_broken_source_does_not_abort_the_run(fake_conn, mocked_cfbd, capsys):
@@ -222,8 +241,8 @@ def test_one_broken_source_does_not_abort_the_run(fake_conn, mocked_cfbd, capsys
 
     assert exit_code == 0, "run must succeed as long as at least one source works"
     assert "FAILED srs" in out
-    assert "sources_attempted=6" in out
-    assert "sources_succeeded=5" in out
+    assert "sources_attempted=7" in out
+    assert "sources_succeeded=6" in out
     assert "sources_failed=['srs']" in out
 
 
@@ -273,6 +292,20 @@ def test_team_ratings_written_for_every_rated_team_regardless_of_opponent(fake_c
     assert sp_team_ratings[1]["raw_value"] == pytest.approx(25.0)   # Ohio State
     assert sp_team_ratings[2]["raw_value"] == pytest.approx(10.0)   # Indiana
     assert sp_team_ratings[1]["season"] == YEAR
+    assert sp_team_ratings[1]["week"] == WEEK  # pinned to this week, not just "latest"
+
+
+def test_ap_poll_captured_but_not_other_polls(fake_conn, mocked_cfbd):
+    # _rankings() has both a Coaches Poll and an AP Top 25 entry for Ohio
+    # State with different ranks (1 vs 2) -- only AP Top 25 should land.
+    collect.run(YEAR, WEEK, "regular")
+    assert len(fake_conn.poll_rankings_inserted) == 2  # Ohio State + Indiana, AP only
+
+    by_team = {r["team_id"]: r for r in fake_conn.poll_rankings_inserted}
+    assert by_team[1]["poll"] == "AP Top 25"
+    assert by_team[1]["poll_rank"] == 2   # AP rank, not the Coaches Poll's rank 1
+    assert by_team[1]["week"] == WEEK
+    assert by_team[2]["poll_rank"] == 15  # Indiana
 
 
 def test_pregame_wp_backfills_margin_from_probability(fake_conn, mocked_cfbd):
