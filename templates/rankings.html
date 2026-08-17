@@ -38,9 +38,11 @@
           {% for t in teams %}
           <tr>
             <th scope="row" data-sort-cell="school">
-              <img class="team-logo-sm" src="{{ t.logo_url or '' }}" alt="" loading="lazy">
-              {% if t.ap_rank %}<span class="ap-rank-badge">{{ t.ap_rank }}</span>{% endif %}
-              {{ t.school }}
+              <div class="rankings-team-cell">
+                <img class="team-logo-sm" src="{{ t.logo_url or '' }}" alt="" loading="lazy">
+                {% if t.ap_rank %}<span class="ap-rank-badge">{{ t.ap_rank }}</span>{% endif %}
+                {{ t.school }}
+              </div>
             </th>
             <td class="num tabular" data-sort-cell="record" data-value="{{ '' if t.record_value is none else t.record_value }}">
               {{ t.record_display }}

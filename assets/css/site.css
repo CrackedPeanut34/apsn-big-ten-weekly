@@ -744,13 +744,16 @@ main {
 }
 
 .rankings-table tbody th {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
   font-family: var(--font-display);
   font-weight: 700;
   font-size: 1rem;
   white-space: nowrap;
+}
+
+.rankings-team-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .team-logo-sm {
