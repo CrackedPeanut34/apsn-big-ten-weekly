@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}Rankings &mdash; APSN Big Ten Weekly{% endblock %}
+
+{% block week_switcher %}{% include "_nav.html" %}{% endblock %}
+
+{% block content %}
+<div class="week-page">
+  <div class="week-heading">
+    <h1>Rankings</h1>
+  </div>
+
+  <p class="rankings-intro">
+    Every Big Ten team's current rating from each source, side by side --
+    never averaged into one number. Click a column to sort by it; click
+    again to flip direction. Teams a source hasn't rated yet sort to the
+    bottom.
+  </p>
+
+  <div class="table-scroll">
+    <table class="rankings-table" id="rankings-table">
+      <thead>
+        <tr>
+          <th scope="col" data-sort-key="school">Team</th>
+          {% for s in sources %}
+          <th scope="col" class="num" data-sort-key="{{ s.slug }}">
+            <a href="#glossary-{{ s.slug }}">{{ s.name }}</a>
+          </th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in teams %}
+        <tr>
+          <th scope="row" data-sort-cell="school">
+            <img class="team-logo-sm" src="{{ t.logo_url or '' }}" alt="" loading="lazy">
+            {{ t.school }}
+          </th>
+          {% for cell in t.cells %}
+          <td class="num tabular" data-sort-cell="{{ cell.slug }}" data-value="{{ '' if cell.value is none else cell.value }}">
+            {{ cell.display }}
+          </td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% include "_glossary.html" %}
+</div>
+{% endblock %}

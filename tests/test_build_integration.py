@@ -55,6 +55,20 @@ ODDS = [
      "collected_at": dt.datetime(2026, 8, 28, 9, 0, tzinfo=dt.timezone.utc)},
 ]
 
+TEAMS = [
+    {"id": 1, "school": "Ohio State", "logo_url": "https://a/light.png"},
+    {"id": 2, "school": "Indiana", "logo_url": "https://b/light.png"},
+]
+
+# Only SP+ has a team_ratings row -- SRS must render as em dash on the
+# rankings page too, same as it does per-game.
+TEAM_RATINGS = [
+    {"team_id": 1, "model_source_id": 1, "raw_value": Decimal("25.0"),
+     "collected_at": dt.datetime(2026, 8, 27, 10, 0, tzinfo=dt.timezone.utc)},
+    {"team_id": 2, "model_source_id": 1, "raw_value": Decimal("10.0"),
+     "collected_at": dt.datetime(2026, 8, 27, 10, 0, tzinfo=dt.timezone.utc)},
+]
+
 
 class FakeCursor:
     def __init__(self, conn):
@@ -84,6 +98,10 @@ class FakeCursor:
             self._result = ("all", ODDS)
         elif "max(t) AS latest" in n:
             self._result = ("one", {"latest": ODDS[0]["collected_at"]})
+        elif n.startswith("SELECT id, school, logo_url FROM teams"):
+            self._result = ("all", TEAMS)
+        elif "FROM team_ratings tr" in n:
+            self._result = ("all", TEAM_RATINGS)
         else:
             raise AssertionError(f"unexpected SQL: {n[:100]}")
 
@@ -167,3 +185,33 @@ def test_index_redirects_to_the_built_week(wired, monkeypatch):
     build.main()
     index_html = (wired / "site" / "index.html").read_text()
     assert f"{SEASON}/week-{WEEK:02d}.html" in index_html
+
+
+def test_rankings_page_written_with_both_teams_and_sources(wired, monkeypatch):
+    monkeypatch.setattr("sys.argv", ["build.py"])
+    exit_code = build.main()
+    assert exit_code == 0
+
+    rankings_page = wired / "site" / str(SEASON) / "rankings.html"
+    assert rankings_page.exists()
+    html = rankings_page.read_text()
+    assert "Ohio State" in html
+    assert "Indiana" in html
+    assert "SP+" in html
+
+
+def test_rankings_page_em_dashes_a_source_with_no_team_rating(wired, monkeypatch):
+    # Only SP+ has team_ratings rows in the fixture -- SRS must not silently
+    # drop its column or show a bare 0.
+    monkeypatch.setattr("sys.argv", ["build.py"])
+    build.main()
+    html = (wired / "site" / str(SEASON) / "rankings.html").read_text()
+    srs_col_start = html.index("SRS")
+    assert "—" in html[srs_col_start:srs_col_start + 600]
+
+
+def test_rankings_nav_link_appears_on_week_page(wired, monkeypatch):
+    monkeypatch.setattr("sys.argv", ["build.py"])
+    build.main()
+    html = (wired / "site" / str(SEASON) / f"week-{WEEK:02d}.html").read_text()
+    assert f'href="../{SEASON}/rankings.html"' in html

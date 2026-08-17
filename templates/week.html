@@ -2,20 +2,7 @@
 
 {% block title %}Week {{ week }} &mdash; APSN Big Ten Weekly{% endblock %}
 
-{% block week_switcher %}
-<nav class="week-switcher" aria-label="Week switcher">
-  <ul>
-    {% for w_season, w_week in all_weeks %}
-    <li>
-      <a href="{{ asset_prefix }}{{ w_season }}/week-{{ '%02d'|format(w_week) }}.html"
-         {% if (w_season, w_week) == current_week %}aria-current="page" class="active"{% endif %}>
-        Week {{ w_week }}
-      </a>
-    </li>
-    {% endfor %}
-  </ul>
-</nav>
-{% endblock %}
+{% block week_switcher %}{% include "_nav.html" %}{% endblock %}
 
 {% block content %}
 <div class="week-page">
@@ -135,16 +122,6 @@
     </form>
   </section>
 
-  <section class="glossary" aria-labelledby="glossary-heading">
-    <h2 id="glossary-heading">Prediction model glossary</h2>
-    {% for s in glossary_sources %}
-    <div class="glossary-entry" id="glossary-{{ s.slug }}">
-      <h3>{{ s.name }}</h3>
-      {% if s.description %}<p>{{ s.description }}</p>{% endif %}
-      {% if s.notes %}<p class="glossary-note">How we use it here: {{ s.notes }}</p>{% endif %}
-      <a href="{{ s.homepage_url }}" rel="noopener">Source &rarr;</a>
-    </div>
-    {% endfor %}
-  </section>
+  {% include "_glossary.html" %}
 </div>
 {% endblock %}

@@ -643,6 +643,91 @@ main {
   text-decoration-color: var(--text-faint);
 }
 
+/* ---------- rankings table ---------- */
+
+.rankings-intro {
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  max-width: 42rem;
+  margin: 0 0 1.5rem;
+}
+
+.rankings-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+  min-width: 480px;
+}
+
+.rankings-table th,
+.rankings-table td {
+  padding: 0.55rem 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.rankings-table .num {
+  text-align: right;
+}
+
+.rankings-table thead th {
+  color: var(--text-faint);
+  font-weight: 600;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+
+.rankings-table thead th a {
+  color: inherit;
+  text-decoration: none;
+  border-bottom: 1px dotted var(--text-faint);
+}
+
+.rankings-table thead th:hover {
+  color: var(--text);
+}
+
+.rankings-table thead th.sorted-asc::after,
+.rankings-table thead th.sorted-desc::after {
+  display: inline-block;
+  margin-left: 0.3rem;
+  font-size: 0.65rem;
+}
+
+.rankings-table thead th.sorted-asc::after {
+  content: '\25B2';
+}
+
+.rankings-table thead th.sorted-desc::after {
+  content: '\25BC';
+}
+
+.rankings-table tbody th {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1rem;
+  white-space: nowrap;
+}
+
+.team-logo-sm {
+  width: 1.4rem;
+  height: 1.4rem;
+  object-fit: contain;
+  flex: none;
+}
+
+.rankings-table tbody tr:last-child th,
+.rankings-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
 /* ---------- footer ---------- */
 
 .site-footer {

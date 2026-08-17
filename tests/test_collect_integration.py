@@ -90,6 +90,8 @@ class FakeCursor:
             self._last_result = ("one", {"latest": None})  # force a refresh
         elif normalized.startswith("SELECT * FROM model_sources"):
             self._last_result = ("all", MODEL_SOURCES)
+        elif normalized == "SELECT id, school FROM teams":
+            self._last_result = ("all", [{"id": t["id"], "school": t["school"]} for t in TEAMS])
         elif normalized.startswith("INSERT INTO teams"):
             self.conn.teams_inserted.append(params)
             self._last_result = None
@@ -101,6 +103,9 @@ class FakeCursor:
             self._last_result = None
         elif normalized.startswith("INSERT INTO odds_snapshots"):
             self.conn.odds_inserted.append(params)
+            self._last_result = None
+        elif normalized.startswith("INSERT INTO team_ratings"):
+            self.conn.team_ratings_inserted.append(params)
             self._last_result = None
         else:
             raise AssertionError(f"unexpected SQL in fake cursor: {normalized[:80]}")
@@ -123,6 +128,7 @@ class FakeConnection:
         self.games_inserted = []
         self.predictions_inserted = []
         self.odds_inserted = []
+        self.team_ratings_inserted = []
         self.commits = 0
         self.rollbacks = 0
 
@@ -255,6 +261,18 @@ def test_neutral_site_game_gets_zero_hfa_not_default(fake_conn, mocked_cfbd):
     assert home_margin == pytest.approx(raw_diff + c.DEFAULT_HFA)
     assert neutral_margin == pytest.approx(raw_diff)
     assert home_margin != neutral_margin
+
+
+def test_team_ratings_written_for_every_rated_team_regardless_of_opponent(fake_conn, mocked_cfbd):
+    # Unlike predictions (one row per game, skipped if either side lacks a
+    # rating), team_ratings gets one row per team a source rates, full stop.
+    collect.run(YEAR, WEEK, "regular")
+    sp_team_ratings = {
+        r["team_id"]: r for r in fake_conn.team_ratings_inserted if r["model_source_id"] == 1
+    }
+    assert sp_team_ratings[1]["raw_value"] == pytest.approx(25.0)   # Ohio State
+    assert sp_team_ratings[2]["raw_value"] == pytest.approx(10.0)   # Indiana
+    assert sp_team_ratings[1]["season"] == YEAR
 
 
 def test_pregame_wp_backfills_margin_from_probability(fake_conn, mocked_cfbd):

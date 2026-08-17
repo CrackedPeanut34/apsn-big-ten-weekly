@@ -83,6 +83,11 @@ GLOSSARY_DESCRIPTIONS = {
     ),
 }
 
+# Elo ratings are large integers (~1200-2200); everything else on the
+# rankings page is a small points-above-average number best shown to one
+# decimal. Keyed by model_sources.slug, default "{:.1f}" if unlisted.
+RATING_FORMATS = {"elo": "{:.0f}"}
+
 
 def log(msg: str) -> None:
     print(f"[build] {msg}", flush=True)
@@ -204,6 +209,51 @@ def fetch_latest_odds(conn, game_ids: list[int]) -> dict[int, list[dict]]:
     for row in rows:
         result[row["game_id"]].append(row)
     return result
+
+
+def fetch_team_ratings(conn, season: int) -> tuple[list[dict], list[dict]]:
+    """Latest team_ratings row per (team, model_source) for every Big Ten
+    team, for every active power-rating source. CFBD Pregame Win Probability
+    is excluded -- it isn't a standalone team rating, it's a per-game output
+    (see build_game_card's model_rows for that one instead)."""
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT * FROM model_sources WHERE active = TRUE AND output_type = 'power_rating' ORDER BY id"
+        )
+        sources = cur.fetchall()
+
+        cur.execute(
+            "SELECT id, school, logo_url FROM teams WHERE conference = 'Big Ten' ORDER BY school"
+        )
+        teams = cur.fetchall()
+
+        cur.execute(
+            """
+            SELECT DISTINCT ON (tr.team_id, tr.model_source_id)
+                   tr.*
+            FROM team_ratings tr
+            WHERE tr.season = %(season)s
+            ORDER BY tr.team_id, tr.model_source_id, tr.collected_at DESC
+            """,
+            {"season": season},
+        )
+        latest = cur.fetchall()
+
+    by_team_and_source = {(r["team_id"], r["model_source_id"]): r for r in latest}
+    rows = []
+    for team in teams:
+        cells = []
+        for source in sources:
+            r = by_team_and_source.get((team["id"], source["id"]))
+            value = float(r["raw_value"]) if r and r["raw_value"] is not None else None
+            fmt = RATING_FORMATS.get(source["slug"], "{:.1f}")
+            cells.append({
+                "slug": source["slug"],
+                "value": value,
+                "display": fmt.format(value) if value is not None else "—",
+            })
+        rows.append({"school": team["school"], "logo_url": team["logo_url"], "cells": cells})
+    return rows, sources
 
 
 # --- pure data shaping (no DB, no I/O -- unit testable) -----------------------
@@ -415,6 +465,33 @@ def render_week(conn, env: Environment, season: int, week: int, all_weeks: list[
     log(f"wrote {os.path.relpath(out_path, ROOT)} ({len(cards)} games)")
 
 
+def render_rankings(conn, env: Environment, season: int, all_weeks: list[tuple[int, int]]) -> None:
+    teams, sources = fetch_team_ratings(conn, season)
+
+    glossary_sources = [
+        {**s, "description": GLOSSARY_DESCRIPTIONS.get(s["slug"])} for s in sources
+    ]
+
+    teams.sort(key=lambda t: t["school"])  # default order; JS sorts client-side from here
+
+    template = env.get_template("rankings.html")
+    html = template.render(
+        asset_prefix="../",
+        season=season,
+        teams=teams,
+        sources=sources,
+        glossary_sources=glossary_sources,
+        all_weeks=all_weeks,
+        current_week=None,
+    )
+
+    out_dir = SITE_DIR / str(season)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_path = out_dir / "rankings.html"
+    out_path.write_text(html)
+    log(f"wrote {os.path.relpath(out_path, ROOT)} ({len(teams)} teams, {len(sources)} sources)")
+
+
 def render_index(env: Environment, default_season: int, default_week: int) -> None:
     template = env.get_template("index.html")
     html = template.render(asset_prefix="", season=default_season, week=default_week)
@@ -460,6 +537,9 @@ def main() -> int:
 
         for season, week in targets:
             render_week(conn, env, season, week, all_weeks)
+
+        for season in sorted({s for s, _ in targets}):
+            render_rankings(conn, env, season, all_weeks)
 
         default_season, default_week = targets[-1] if not args.all_weeks else determine_default_week(conn)
         render_index(env, default_season, default_week)

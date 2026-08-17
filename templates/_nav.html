@@ -1,0 +1,18 @@
+<nav class="week-switcher" aria-label="Week and rankings switcher">
+  <ul>
+    {% for w_season, w_week in all_weeks %}
+    <li>
+      <a href="{{ asset_prefix }}{{ w_season }}/week-{{ '%02d'|format(w_week) }}.html"
+         {% if (w_season, w_week) == current_week %}aria-current="page" class="active"{% endif %}>
+        Week {{ w_week }}
+      </a>
+    </li>
+    {% endfor %}
+    <li>
+      <a href="{{ asset_prefix }}{{ season }}/rankings.html"
+         {% if current_week is none %}aria-current="page" class="active"{% endif %}>
+        Rankings
+      </a>
+    </li>
+  </ul>
+</nav>

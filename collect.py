@@ -211,6 +211,41 @@ def collect_power_rating_source(conn, source: dict, games: list[dict], ratings: 
     return rows
 
 
+def collect_team_ratings(conn, source: dict, ratings: list[dict], season: int,
+                          team_key: str = "team", rating_key: str = "rating") -> int:
+    """Every team a source rates, independent of who they're playing this
+    week -- see 0003_team_ratings.sql for why collect_power_rating_source's
+    per-game rows aren't enough on their own."""
+    with conn.cursor() as cur:
+        cur.execute("SELECT id, school FROM teams")
+        team_id_by_school = {row["school"]: row["id"] for row in cur.fetchall()}
+
+        rows = 0
+        for r in ratings:
+            team_id = team_id_by_school.get(r[team_key])
+            if team_id is None:
+                continue  # team not upserted yet -- refresh_teams_if_stale will catch it next run
+            cur.execute(
+                """
+                INSERT INTO team_ratings (team_id, model_source_id, season, collected_at,
+                                           raw_value, raw_payload, conversion_version)
+                VALUES (%(team_id)s, %(model_source_id)s, %(season)s, now(),
+                        %(raw_value)s, %(raw_payload)s, %(conversion_version)s)
+                """,
+                {
+                    "team_id": team_id,
+                    "model_source_id": source["id"],
+                    "season": season,
+                    "raw_value": r[rating_key],
+                    "raw_payload": json.dumps(r),
+                    "conversion_version": c.CONVERSION_VERSION,
+                },
+            )
+            rows += 1
+    conn.commit()
+    return rows
+
+
 def collect_pregame_wp_source(conn, source: dict, games: list[dict],
                                wp_rows: list[dict]) -> int:
     by_game_id = {w["gameId"]: w for w in wp_rows}
@@ -335,18 +370,22 @@ def run(year: int, week: int, season_type: str = "regular") -> int:
             if source["slug"] == "sp-plus":
                 ratings = cfbd_client.get_sp(year=year)
                 rows = collect_power_rating_source(conn, source, games, ratings)
+                rows += collect_team_ratings(conn, source, ratings, year)
             elif source["slug"] == "srs":
                 # Not conference-filtered: nonconference opponents need a
                 # rating too, or the home-minus-away differential can never
                 # be computed (see the same fix on teams/games above).
                 ratings = cfbd_client.get_srs(year=year)
                 rows = collect_power_rating_source(conn, source, games, ratings)
+                rows += collect_team_ratings(conn, source, ratings, year)
             elif source["slug"] == "elo":
                 ratings = cfbd_client.get_elo(year=year, week=week)
                 rows = collect_power_rating_source(conn, source, games, ratings, rating_key="elo")
+                rows += collect_team_ratings(conn, source, ratings, year, rating_key="elo")
             elif source["slug"] == "fpi":
                 ratings = cfbd_client.get_fpi(year=year)
                 rows = collect_power_rating_source(conn, source, games, ratings, rating_key="fpi")
+                rows += collect_team_ratings(conn, source, ratings, year, rating_key="fpi")
             elif source["slug"] == "cfbd-pregame-wp":
                 wp_rows = cfbd_client.get_pregame_wp(year=year, week=week, season_type=season_type)
                 rows = collect_pregame_wp_source(conn, source, games, wp_rows)
@@ -354,7 +393,7 @@ def run(year: int, week: int, season_type: str = "regular") -> int:
                 log(f"WARNING: no collector wired up for model source '{source['slug']}', skipping")
                 continue
 
-            log(f"{source['slug']}: wrote {rows} prediction rows")
+            log(f"{source['slug']}: wrote {rows} rows")
             total_rows += rows
             succeeded += 1
         except Exception as e:
