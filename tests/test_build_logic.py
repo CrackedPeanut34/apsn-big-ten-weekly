@@ -81,6 +81,20 @@ def test_em_dash_if_none_custom_format():
     assert build.em_dash_if_none(68.4, "{:.0f}%") == "68%"
 
 
+def test_win_prob_pct_display_rounds_normally():
+    assert build.win_prob_pct_display(0.684) == "68%"
+
+
+def test_win_prob_pct_display_caps_at_99_percent():
+    assert build.win_prob_pct_display(0.999) == "99%"
+    assert build.win_prob_pct_display(1.0) == "99%"
+    assert build.win_prob_pct_display(0.996) == "99%"  # would round to 100%
+
+
+def test_win_prob_pct_display_none_is_em_dash():
+    assert build.win_prob_pct_display(None) == "—"
+
+
 def test_parse_summary_missing_file_returns_none(tmp_path, monkeypatch):
     monkeypatch.setattr(build, "SUMMARIES_DIR", tmp_path)
     assert build.parse_summary(999999, 2026, 1) is None

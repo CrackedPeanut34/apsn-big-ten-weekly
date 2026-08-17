@@ -381,6 +381,14 @@ def em_dash_if_none(value, fmt: str = "{:.1f}") -> str:
     return fmt.format(float(value))
 
 
+def win_prob_pct_display(win_prob_home: float | None) -> str:
+    """win_prob_home -> rounded percentage, capped at 99% -- a model/book
+    saying "100%" reads as certainty nothing here actually claims."""
+    if win_prob_home is None:
+        return "—"
+    return f"{min(round(win_prob_home * 100), 99)}%"
+
+
 def extract_fpi(predictions: list[dict]) -> tuple[float, float] | None:
     """Each team's own FPI rating for this game, read back out of the FPI
     model's raw_payload (raw_value on that row is home - away, not useful
@@ -461,7 +469,7 @@ def build_game_card(game: dict, predictions: list[dict], odds: list[dict],
             "slug": source["slug"],
             "favored_abbr": favored_team_abbr(margin_home, game),
             "margin_display": em_dash_if_none(margin_home),
-            "win_prob_display": em_dash_if_none(win_prob_home * 100 if win_prob_home is not None else None, "{:.0f}%"),
+            "win_prob_display": win_prob_pct_display(win_prob_home),
             "divergence": divergence_chip(margin_home, market_margin),
         })
 
@@ -473,7 +481,7 @@ def build_game_card(game: dict, predictions: list[dict], odds: list[dict],
             "provider": o["provider"],
             "favored_abbr": favored_team_abbr(margin_home, game),
             "margin_display": em_dash_if_none(margin_home),
-            "win_prob_display": em_dash_if_none(win_prob_home * 100 if win_prob_home is not None else None, "{:.0f}%"),
+            "win_prob_display": win_prob_pct_display(win_prob_home),
             "spread_home": o["spread_home"],
             "over_under": o["over_under"],
         })
