@@ -214,12 +214,6 @@ main {
   margin: 0 0 0.25rem;
 }
 
-.collected-at {
-  color: var(--text-faint);
-  font-size: 0.85rem;
-  margin: 0;
-}
-
 .team-filter {
   display: flex;
   align-items: center;
@@ -259,23 +253,6 @@ main {
 .team-filter-chip.is-active {
   border-color: var(--red);
   box-shadow: 0 0 0 2px var(--red-wash);
-}
-
-.team-filter-chip[data-team-filter='all'] {
-  width: auto;
-  border-radius: var(--radius-sm);
-  padding: 0 0.85rem;
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: var(--text-dim);
-  white-space: nowrap;
-}
-
-.team-filter-chip[data-team-filter='all'].is-active {
-  color: var(--text);
 }
 
 .game-card.is-filtered-out {
@@ -381,19 +358,9 @@ main {
 }
 
 .matchup-at {
-  color: var(--text-faint);
-  font-size: 0.85rem;
-  flex: none;
-}
-
-.home-marker {
-  font-size: 0.6rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  color: var(--red);
-  border: 1px solid var(--red);
-  border-radius: 3px;
-  padding: 0.05rem 0.3rem;
+  color: var(--text);
+  font-weight: 800;
+  font-size: 1rem;
   flex: none;
 }
 
@@ -476,6 +443,35 @@ main {
 
 .market-row th {
   font-weight: 600;
+}
+
+.favored-abbr {
+  margin-left: 0.35rem;
+  color: var(--text-faint);
+  font-weight: 700;
+  font-size: 0.72rem;
+  letter-spacing: 0.03em;
+}
+
+.table-section-label th {
+  background: var(--bg-elevated-2);
+  color: var(--text-faint);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.35rem 0.5rem;
+}
+
+.table-section-note {
+  margin-left: 0.5rem;
+  color: var(--text-faint);
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: 0.7rem;
+  text-transform: none;
+  letter-spacing: normal;
 }
 
 .model-table tbody tr:last-child td,

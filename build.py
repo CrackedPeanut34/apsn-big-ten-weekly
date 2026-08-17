@@ -30,6 +30,12 @@ ASSETS_DIR = ROOT / "assets"
 DIVERGENCE_THRESHOLD = 3.0       # points
 EASTERN = ZoneInfo("America/New_York")
 
+# Display order for sportsbook rows. CFBD's /lines only covers Bovada and
+# DraftKings for these games today -- FanDuel is listed so it slots into
+# place automatically if CFBD adds coverage later. Unlisted providers sort
+# after these, alphabetically among themselves.
+PROVIDER_ORDER = {"DraftKings": 0, "FanDuel": 1, "Bovada": 2}
+
 
 def log(msg: str) -> None:
     print(f"[build] {msg}", flush=True)
@@ -153,23 +159,6 @@ def fetch_latest_odds(conn, game_ids: list[int]) -> dict[int, list[dict]]:
     return result
 
 
-def fetch_most_recent_collection_time(conn, game_ids: list[int]):
-    if not game_ids:
-        return None
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            SELECT max(t) AS latest FROM (
-                SELECT max(collected_at) AS t FROM predictions WHERE game_id = ANY(%(ids)s)
-                UNION ALL
-                SELECT max(collected_at) AS t FROM odds_snapshots WHERE game_id = ANY(%(ids)s)
-            ) x
-            """,
-            {"ids": game_ids},
-        )
-        return cur.fetchone()["latest"]
-
-
 # --- pure data shaping (no DB, no I/O -- unit testable) -----------------------
 
 def market_avg_margin(odds_rows: list[dict]) -> float | None:
@@ -275,13 +264,21 @@ def build_game_card(game: dict, predictions: list[dict], odds: list[dict],
     for o in odds:
         margin_home = float(o["margin_home"]) if o["margin_home"] is not None else None
         win_prob_home = float(o["win_prob_home"]) if o["win_prob_home"] is not None else None
+        if margin_home is None or margin_home == 0:
+            favored_abbr = None
+        elif margin_home > 0:
+            favored_abbr = game["home_abbr"]
+        else:
+            favored_abbr = game["away_abbr"]
         market_rows.append({
             "provider": o["provider"],
+            "favored_abbr": favored_abbr,
             "margin_display": em_dash_if_none(margin_home),
             "win_prob_display": em_dash_if_none(win_prob_home * 100 if win_prob_home is not None else None, "{:.0f}%"),
             "spread_home": o["spread_home"],
             "over_under": o["over_under"],
         })
+    market_rows.sort(key=lambda r: PROVIDER_ORDER.get(r["provider"], len(PROVIDER_ORDER)))
 
     summary = parse_summary(game["id"], season, week)
 
@@ -318,7 +315,6 @@ def render_week(conn, env: Environment, season: int, week: int, all_weeks: list[
     game_ids = [g["id"] for g in games]
     predictions_by_game = fetch_latest_predictions(conn, game_ids)
     odds_by_game = fetch_latest_odds(conn, game_ids)
-    last_collected = fetch_most_recent_collection_time(conn, game_ids)
 
     cards = [
         build_game_card(g, predictions_by_game[g["id"]], odds_by_game[g["id"]], season, week)
@@ -345,10 +341,6 @@ def render_week(conn, env: Environment, season: int, week: int, all_weeks: list[
     # with no FPI coverage on either side fall back to closest-market-line.
     cards.sort(key=lambda c: (c["avg_fpi"] is None, -(c["avg_fpi"] or 0), c["sort_key"]))
 
-    last_collected_display = None
-    if last_collected is not None:
-        last_collected_display = last_collected.astimezone(EASTERN).strftime("%b %-d, %Y %-I:%M %p ET")
-
     template = env.get_template("week.html")
     html = template.render(
         asset_prefix="../",
@@ -358,7 +350,6 @@ def render_week(conn, env: Environment, season: int, week: int, all_weeks: list[
         teams=teams,
         all_weeks=all_weeks,
         current_week=(season, week),
-        last_collected_display=last_collected_display,
     )
 
     out_dir = SITE_DIR / str(season)

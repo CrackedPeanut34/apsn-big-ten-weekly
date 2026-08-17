@@ -14,8 +14,8 @@
 })();
 
 // Team filter: clicking a team logo shows only that team's game cards.
-// Clicking the already-active chip (or "All teams") resets the filter.
-// Pure client-side -- no navigation, no separate page.
+// Clicking the already-active chip resets the filter (shows everything).
+// Pure client-side -- no navigation, no separate page, no "all" button.
 (function () {
   var bar = document.querySelector('.team-filter');
   if (!bar) return;
@@ -25,7 +25,7 @@
   function applyFilter(team) {
     cards.forEach(function (card) {
       var teams = (card.dataset.teams || '').split('|');
-      var match = team === 'all' || teams.indexOf(team) !== -1;
+      var match = !team || teams.indexOf(team) !== -1;
       card.classList.toggle('is-filtered-out', !match);
     });
   }
@@ -33,11 +33,13 @@
   chips.forEach(function (chip) {
     chip.addEventListener('click', function () {
       var wasActive = chip.classList.contains('is-active');
-      var team = chip.dataset.teamFilter;
-      var nextTeam = (wasActive && team !== 'all') ? 'all' : team;
       chips.forEach(function (c) { c.classList.remove('is-active'); });
-      bar.querySelector('[data-team-filter="' + nextTeam + '"]').classList.add('is-active');
-      applyFilter(nextTeam);
+      if (wasActive) {
+        applyFilter(null);
+      } else {
+        chip.classList.add('is-active');
+        applyFilter(chip.dataset.teamFilter);
+      }
     });
   });
 })();
