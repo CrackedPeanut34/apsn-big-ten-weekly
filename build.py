@@ -263,6 +263,26 @@ def compute_national_ranks(latest: list[dict]) -> dict[tuple[int, int], int]:
     return national_rank
 
 
+def fetch_ap_ranks(conn, season: int, week: int) -> dict[int, int]:
+    """team_id -> AP Top 25 rank, as of this week specifically -- same week-
+    pinning as team_ratings (0004_week_scoped_rankings.sql), so a team's
+    rank here never changes once a later week's poll has its own rows.
+    Shared by the rankings table and by game cards (rank badge next to each
+    team's logo), so there's exactly one query for "this week's AP rank."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT DISTINCT ON (pr.team_id)
+                   pr.team_id, pr.poll_rank
+            FROM poll_rankings pr
+            WHERE pr.season = %(season)s AND pr.week = %(week)s AND pr.poll = %(poll)s
+            ORDER BY pr.team_id, pr.collected_at DESC
+            """,
+            {"season": season, "week": week, "poll": "AP Top 25"},
+        )
+        return {row["team_id"]: row["poll_rank"] for row in cur.fetchall()}
+
+
 def fetch_team_ratings(conn, season: int, week: int) -> tuple[list[dict], list[dict]]:
     """Every Big Ten team's rating from every active power-rating source, as
     of one specific week -- pinned there forever by week (0004_week_scoped_
@@ -297,18 +317,7 @@ def fetch_team_ratings(conn, season: int, week: int) -> tuple[list[dict], list[d
         )
         latest = cur.fetchall()
 
-        cur.execute(
-            """
-            SELECT DISTINCT ON (pr.team_id)
-                   pr.team_id, pr.poll_rank
-            FROM poll_rankings pr
-            WHERE pr.season = %(season)s AND pr.week = %(week)s AND pr.poll = %(poll)s
-            ORDER BY pr.team_id, pr.collected_at DESC
-            """,
-            {"season": season, "week": week, "poll": "AP Top 25"},
-        )
-        ap_rank_by_team = {row["team_id"]: row["poll_rank"] for row in cur.fetchall()}
-
+    ap_rank_by_team = fetch_ap_ranks(conn, season, week)
     national_rank = compute_national_ranks(latest)
     records = fetch_team_records(conn, season)
     by_team_and_source = {(r["team_id"], r["model_source_id"]): r for r in latest}
@@ -427,8 +436,19 @@ def favored_team_abbr(margin_home: float | None, game: dict) -> str | None:
     return game["home_abbr"] if margin_home > 0 else game["away_abbr"]
 
 
+def game_winner(home_points: int | None, away_points: int | None) -> str | None:
+    """'home', 'away', or None if unplayed (or, in principle, tied)."""
+    if home_points is None or away_points is None:
+        return None
+    if home_points > away_points:
+        return "home"
+    if away_points > home_points:
+        return "away"
+    return None
+
+
 def build_game_card(game: dict, predictions: list[dict], odds: list[dict],
-                     season: int, week: int) -> dict:
+                     season: int, week: int, ap_rank_by_team: dict[int, int]) -> dict:
     market_margin = market_avg_margin(odds)
 
     model_rows = []
@@ -465,6 +485,9 @@ def build_game_card(game: dict, predictions: list[dict], odds: list[dict],
     home_fpi, away_fpi = fpi if fpi else (None, None)
     avg_fpi = (home_fpi + away_fpi) / 2 if fpi else None
 
+    home_points, away_points = game["home_points"], game["away_points"]
+    winner = game_winner(home_points, away_points)
+
     return {
         "id": game["id"],
         "start_date": game["start_date"],
@@ -474,14 +497,20 @@ def build_game_card(game: dict, predictions: list[dict], odds: list[dict],
         "home_school": game["home_school"], "home_abbr": game["home_abbr"],
         "home_logo_url": game["home_logo_url"], "home_logo_dark_url": game["home_logo_dark_url"],
         "home_color": game["home_color"], "home_fpi": home_fpi,
+        "home_ap_rank": ap_rank_by_team.get(game["home_team_id"]),
         "away_school": game["away_school"], "away_abbr": game["away_abbr"],
         "away_logo_url": game["away_logo_url"], "away_logo_dark_url": game["away_logo_dark_url"],
         "away_color": game["away_color"], "away_fpi": away_fpi,
+        "away_ap_rank": ap_rank_by_team.get(game["away_team_id"]),
         "model_rows": model_rows,
         "market_rows": market_rows,
         "sort_key": market_closeness_key(odds),
         "avg_fpi": avg_fpi,
         "summary": summary,
+        "home_points": home_points,
+        "away_points": away_points,
+        "final": home_points is not None and away_points is not None,
+        "winner": winner,
     }
 
 
@@ -494,9 +523,10 @@ def render_week(conn, env: Environment, season: int, week: int, all_weeks: list[
     game_ids = [g["id"] for g in games]
     predictions_by_game = fetch_latest_predictions(conn, game_ids)
     odds_by_game = fetch_latest_odds(conn, game_ids)
+    ap_rank_by_team = fetch_ap_ranks(conn, season, week)
 
     cards = [
-        build_game_card(g, predictions_by_game[g["id"]], odds_by_game[g["id"]], season, week)
+        build_game_card(g, predictions_by_game[g["id"]], odds_by_game[g["id"]], season, week, ap_rank_by_team)
         for g in games
     ]
 

@@ -55,6 +55,23 @@ def test_sorting_by_closeness_puts_tightest_game_first():
     assert cards == [close_game, blowout, no_market]
 
 
+def test_game_winner_home_wins():
+    assert build.game_winner(24, 17) == "home"
+
+
+def test_game_winner_away_wins():
+    assert build.game_winner(14, 21) == "away"
+
+
+def test_game_winner_none_when_unplayed():
+    assert build.game_winner(None, None) is None
+    assert build.game_winner(10, None) is None
+
+
+def test_game_winner_none_on_tie():
+    assert build.game_winner(21, 21) is None
+
+
 def test_em_dash_if_none_formats_value():
     assert build.em_dash_if_none(3.456) == "3.5"
     assert build.em_dash_if_none(None) == "—"

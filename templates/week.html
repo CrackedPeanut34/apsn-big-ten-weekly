@@ -26,18 +26,26 @@
       {% endif %}
       <header class="game-card-header">
         <div class="matchup">
-          <div class="team team-away">
+          <div class="team team-away{% if card.final and card.winner == 'away' %} is-winner{% endif %}{% if card.final and card.winner == 'home' %} is-loser{% endif %}">
             <img class="team-logo" src="{{ card.away_logo_url or '' }}" alt="{{ card.away_school }} logo" loading="lazy">
+            {% if card.away_ap_rank %}<span class="ap-rank-badge">{{ card.away_ap_rank }}</span>{% endif %}
             <span class="team-name">{{ card.away_school }}</span>
+            {% if card.final %}<span class="team-score">{{ card.away_points }}</span>{% endif %}
           </div>
           <span class="matchup-at">@</span>
-          <div class="team team-home">
+          <div class="team team-home{% if card.final and card.winner == 'home' %} is-winner{% endif %}{% if card.final and card.winner == 'away' %} is-loser{% endif %}">
             <img class="team-logo" src="{{ card.home_logo_url or '' }}" alt="{{ card.home_school }} logo" loading="lazy">
+            {% if card.home_ap_rank %}<span class="ap-rank-badge">{{ card.home_ap_rank }}</span>{% endif %}
             <span class="team-name">{{ card.home_school }}</span>
+            {% if card.final %}<span class="team-score">{{ card.home_points }}</span>{% endif %}
           </div>
         </div>
         <div class="game-meta">
+          {% if card.final %}
+          <span class="final-badge">Final</span>
+          {% else %}
           <span class="kickoff">{{ card.start_date|eastern_kickoff }}</span>
+          {% endif %}
           {% if card.tv %}<span class="tv">{{ card.tv }}</span>{% endif %}
           {% if card.neutral_site %}<span class="neutral-badge">Neutral site</span>{% endif %}
           {% if card.venue %}<span class="venue">{{ card.venue }}</span>{% endif %}

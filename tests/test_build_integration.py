@@ -26,6 +26,8 @@ GAME_ROW = {
     "venue": "Ohio Stadium",
     "home_points": None,
     "away_points": None,
+    "home_team_id": HOME_TEAM_ID,
+    "away_team_id": AWAY_TEAM_ID,
     "home_school": "Ohio State", "home_abbr": "OSU",
     "home_logo_url": "https://a/light.png", "home_logo_dark_url": "https://a/dark.png",
     "home_color": "#BB0000", "home_alt_color": "#000000", "home_conference": "Big Ten",
@@ -82,6 +84,7 @@ TEAM_RATINGS = [
 ]
 
 # Ohio State is AP-ranked, Indiana isn't (unranked -> no poll_rankings row).
+# Feeds both the rankings table and the AP-rank badge on game cards.
 AP_RANKINGS = [
     {"team_id": 1, "poll_rank": 3},
 ]
@@ -203,6 +206,51 @@ def test_divergence_chip_appears_when_model_diverges_from_market(wired, monkeypa
     assert "+3.0 vs market" in html
 
 
+def test_final_score_shown_once_game_is_played(wired, monkeypatch):
+    monkeypatch.setitem(GAME_ROW, "home_points", 24)
+    monkeypatch.setitem(GAME_ROW, "away_points", 17)
+    monkeypatch.setattr("sys.argv", ["build.py"])
+    build.main()
+    html = (wired / "site" / str(SEASON) / f"week-{WEEK:02d}.html").read_text()
+    assert "final-badge" in html
+    assert ">24<" in html
+    assert ">17<" in html
+    assert "is-winner" in html
+    assert "is-loser" in html
+
+
+def test_unplayed_game_shows_kickoff_not_final(wired, monkeypatch):
+    # GAME_ROW's default fixture state -- points still None.
+    monkeypatch.setattr("sys.argv", ["build.py"])
+    build.main()
+    html = (wired / "site" / str(SEASON) / f"week-{WEEK:02d}.html").read_text()
+    assert "final-badge" not in html
+    assert "kickoff" in html
+
+
+def test_ap_rank_badge_appears_next_to_ranked_teams_logo(wired, monkeypatch):
+    # Ohio State (home, id=1) is AP #3 in the fixture; Indiana (away, id=2)
+    # is unranked and must not get a bare/blank badge.
+    monkeypatch.setattr("sys.argv", ["build.py"])
+    build.main()
+    html = (wired / "site" / str(SEASON) / f"week-{WEEK:02d}.html").read_text()
+    card_html = html[html.index('id="game-1001"'):]
+    logo_idx = card_html.index('src="https://a/light.png"')  # Ohio State's logo
+    badge_idx = card_html.index("ap-rank-badge", logo_idx)
+    assert badge_idx - logo_idx < 200  # badge sits right after the logo
+    assert ">3<" in card_html[badge_idx:badge_idx + 40]  # bare number, no "AP" label
+
+
+def test_unranked_team_gets_no_ap_badge_on_card(wired, monkeypatch):
+    monkeypatch.setattr("sys.argv", ["build.py"])
+    build.main()
+    html = (wired / "site" / str(SEASON) / f"week-{WEEK:02d}.html").read_text()
+    card_html = html[html.index('id="game-1001"'):]
+    away_logo_idx = card_html.index('src="https://b/light.png"')  # Indiana's logo
+    away_name_idx = card_html.index("Indiana", away_logo_idx)
+    assert "ap-rank-badge" not in card_html[away_logo_idx:away_name_idx]
+
+
 def test_index_redirects_to_the_built_week(wired, monkeypatch):
     monkeypatch.setattr("sys.argv", ["build.py"])
     build.main()
@@ -263,7 +311,8 @@ def test_rankings_page_shows_national_rank_and_ap_badge(wired, monkeypatch):
     build.main()
     html = (wired / "site" / str(SEASON) / RANKINGS_FILENAME).read_text()
     assert "No. 1" in html
-    assert "AP 3" in html
+    badge_idx = html.index("ap-rank-badge")
+    assert ">3<" in html[badge_idx:badge_idx + 40]  # bare number, no "AP" label
 
 
 def test_rankings_nav_link_appears_on_week_page(wired, monkeypatch):

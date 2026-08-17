@@ -380,6 +380,27 @@ main {
   font-weight: 600;
 }
 
+.game-meta .final-badge {
+  color: var(--red-text);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.team-score {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.1rem;
+  font-variant-numeric: tabular-nums;
+  flex: none;
+}
+
+.team.is-loser .team-name,
+.team.is-loser .team-score {
+  color: var(--text-faint);
+  font-weight: 600;
+}
+
 /* ---------- model table ---------- */
 
 .table-scroll {
