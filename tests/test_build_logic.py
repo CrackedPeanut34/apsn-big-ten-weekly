@@ -55,27 +55,6 @@ def test_sorting_by_closeness_puts_tightest_game_first():
     assert cards == [close_game, blowout, no_market]
 
 
-def test_format_headline_leads_with_win_prob_below_cutoff():
-    headline = build.format_headline(6.0, 0.68, "OSU", "IU")
-    assert headline == "OSU 68% to win"
-
-
-def test_format_headline_leads_with_margin_above_cutoff():
-    headline = build.format_headline(21.0, 0.91, "OSU", "IU")
-    assert headline == "OSU by 21.0"
-
-
-def test_format_headline_uses_away_team_when_underdog_at_home():
-    # home margin is negative -> away team is favored
-    headline = build.format_headline(-24.0, 0.05, "IU", "OSU")
-    assert headline.startswith("OSU")
-    assert "by 24.0" in headline
-
-
-def test_format_headline_em_dash_when_no_market():
-    assert build.format_headline(None, None, "OSU", "IU") == "—"
-
-
 def test_em_dash_if_none_formats_value():
     assert build.em_dash_if_none(3.456) == "3.5"
     assert build.em_dash_if_none(None) == "—"

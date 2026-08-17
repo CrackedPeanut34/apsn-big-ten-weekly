@@ -28,7 +28,6 @@ SUMMARIES_DIR = ROOT / "content" / "summaries"
 ASSETS_DIR = ROOT / "assets"
 
 DIVERGENCE_THRESHOLD = 3.0       # points
-HEADLINE_WIN_PROB_CUTOFF = 0.85  # above this, lead with margin instead of win%
 EASTERN = ZoneInfo("America/New_York")
 
 
@@ -198,22 +197,6 @@ def market_closeness_key(odds_rows: list[dict]) -> float:
     return min(values)
 
 
-def format_headline(margin_home: float | None, win_prob_home: float | None,
-                     home_abbr: str, away_abbr: str) -> str:
-    """The card's single big number, built from the market baseline. Above
-    ~85% win probability the percentage stops carrying information, so it
-    leads with margin there instead."""
-    if margin_home is None or win_prob_home is None:
-        return "—"
-
-    favored_abbr = home_abbr if margin_home >= 0 else away_abbr
-    favored_wp = win_prob_home if margin_home >= 0 else (1 - win_prob_home)
-
-    if favored_wp >= HEADLINE_WIN_PROB_CUTOFF:
-        return f"{favored_abbr} by {abs(margin_home):.1f}"
-    return f"{favored_abbr} {favored_wp * 100:.0f}% to win"
-
-
 def em_dash_if_none(value, fmt: str = "{:.1f}") -> str:
     if value is None:
         return "—"
@@ -287,11 +270,6 @@ def build_game_card(game: dict, predictions: list[dict], odds: list[dict],
             "over_under": o["over_under"],
         })
 
-    headline_wp = None
-    if market_margin is not None:
-        wp_values = [float(o["win_prob_home"]) for o in odds if o.get("win_prob_home") is not None]
-        headline_wp = sum(wp_values) / len(wp_values) if wp_values else None
-
     summary = parse_summary(game["id"], season, week)
 
     return {
@@ -306,7 +284,6 @@ def build_game_card(game: dict, predictions: list[dict], odds: list[dict],
         "away_school": game["away_school"], "away_abbr": game["away_abbr"],
         "away_logo_url": game["away_logo_url"], "away_logo_dark_url": game["away_logo_dark_url"],
         "away_color": game["away_color"],
-        "headline": format_headline(market_margin, headline_wp, game["home_abbr"], game["away_abbr"]),
         "model_rows": model_rows,
         "market_rows": market_rows,
         "sort_key": market_closeness_key(odds),

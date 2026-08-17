@@ -1,26 +1,28 @@
 /* APSN Big Ten Weekly
-   Direction: near-black ground, red as accent only (rules, active states,
-   divergence chips). The wordmark's forward shear is echoed exactly once,
-   structurally, via --skew below -- used on the header rule, the active
-   week-switcher tab, and divergence chips. Nowhere else. */
+   Direction: warm off-white ground (paper / game-program feel), red as
+   accent only (rules, active states, divergence chips). The wordmark's
+   forward shear is echoed exactly once, structurally, via --skew below --
+   used on the header rule, the active week-switcher tab, and divergence
+   chips. Nowhere else. */
 
 @import url('https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap');
 
 :root {
-  --bg: #101012;
-  --bg-elevated: #1a1a1d;
-  --bg-elevated-2: #202024;
-  --border: rgba(255, 255, 255, 0.09);
-  --text: #f2f1ee;
-  --text-dim: #a8a6a2;
-  --text-faint: #706e6b;
+  --bg: #f6f3ec;
+  --bg-elevated: #ffffff;
+  --bg-elevated-2: #f1ede3;
+  --border: rgba(0, 0, 0, 0.12);
+  --text: #1c1a16;
+  --text-dim: #57524a;
+  --text-faint: #655f54;
   --red: #cd242e;
-  --red-bright: #ff4757;
-  --red-wash: rgba(205, 36, 46, 0.14);
-  --focus: #ff4757;
+  --red-text: #a5101a;
+  --red-wash: rgba(205, 36, 46, 0.1);
+  --focus: #cd242e;
   --skew: -10deg;
   --radius: 12px;
   --radius-sm: 6px;
+  --card-shadow: 0 1px 3px rgba(28, 26, 22, 0.07), 0 1px 2px rgba(28, 26, 22, 0.05);
   --font-display: 'Big Shoulders Display', 'Arial Narrow', sans-serif;
   --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
@@ -31,7 +33,7 @@
 
 html {
   background: var(--bg);
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 body {
@@ -232,6 +234,7 @@ main {
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: var(--radius);
+  box-shadow: var(--card-shadow);
   padding: 1rem;
   display: flex;
   flex-direction: column;
@@ -306,16 +309,8 @@ main {
 }
 
 .game-meta .neutral-badge {
-  color: var(--red-bright);
+  color: var(--red-text);
   font-weight: 600;
-}
-
-.game-card-headline {
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 1.3rem;
-  margin: 0;
-  color: var(--text);
 }
 
 /* ---------- model table ---------- */
@@ -424,8 +419,8 @@ main {
   display: inline-block;
   margin: 0 0 0.5rem;
   padding: 0.15rem 0.5rem;
-  border: 1px solid var(--red-bright);
-  color: var(--red-bright);
+  border: 1px solid var(--red-text);
+  color: var(--red-text);
   font-size: 0.7rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -523,7 +518,7 @@ main {
 }
 
 .feedback-form button:hover {
-  background: var(--red-bright);
+  background: var(--red-text);
 }
 
 /* ---------- footer ---------- */
