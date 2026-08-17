@@ -29,8 +29,8 @@
           <tr>
             <th scope="row" data-sort-cell="school">
               <div class="rankings-team-cell">
-                <img class="team-logo-sm" src="{{ t.logo_url or '' }}" alt="" loading="lazy">
                 {% if t.ap_rank %}<span class="ap-rank-badge">{{ t.ap_rank }}</span>{% endif %}
+                <img class="team-logo-sm" src="{{ t.logo_url or '' }}" alt="" loading="lazy">
                 {{ t.school }}
               </div>
             </th>

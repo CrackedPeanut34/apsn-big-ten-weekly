@@ -18,6 +18,8 @@
   --red: #cd242e;
   --red-text: #a5101a;
   --red-wash: rgba(205, 36, 46, 0.1);
+  --blue: #0088ce;
+  --blue-wash: rgba(0, 136, 206, 0.1);
   --focus: #cd242e;
   --skew: -10deg;
   --radius: 12px;
@@ -284,6 +286,8 @@ main {
 .game-card {
   background: var(--bg-elevated);
   border: 1px solid var(--border);
+  border-left: 4px solid var(--away-color, var(--border));
+  border-right: 4px solid var(--home-color, var(--border));
   border-radius: var(--radius);
   box-shadow: var(--card-shadow);
   padding: 1rem;
@@ -471,9 +475,9 @@ main {
 }
 
 .table-section-label th {
-  background: var(--bg-elevated-2);
+  background: var(--blue-wash);
   color: var(--text-faint);
-  font-family: var(--font-display);
+  font-family: var(--font-body);
   font-weight: 700;
   font-size: 0.75rem;
   text-transform: uppercase;
@@ -738,6 +742,7 @@ main {
 
 .rankings-team-cell {
   display: flex;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 0.5rem;
 }
