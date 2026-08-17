@@ -1,0 +1,7 @@
+requests>=2.31
+psycopg[binary]>=3.1
+python-dotenv>=1.0
+Jinja2>=3.1
+PyYAML>=6.0
+markdown>=3.5
+pytest>=8.0

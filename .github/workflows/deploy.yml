@@ -1,0 +1,64 @@
+name: Collect, build, and deploy
+
+on:
+  schedule:
+    # Tue/Thu/Sat mornings, 12:00 UTC (8am ET / 7am during standard time).
+    # GitHub Actions cron is fixed UTC and doesn't shift for DST -- v1 accepts
+    # the hour drifting by one across the fall/spring changeover.
+    - cron: '0 12 * * 2,4,6'
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      collect:
+        description: 'Also run collect.py (pulls fresh data from CFBD)'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - run: pip install -r requirements.txt
+
+      - name: Apply migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python migrate.py
+
+      - name: Collect this week's data
+        if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.collect)
+        env:
+          CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python collect.py
+
+      - name: Build static site
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python build.py --all-weeks
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+
+{% block title %}Week {{ week }} &mdash; APSN Big Ten Weekly{% endblock %}
+
+{% block week_switcher %}
+<nav class="week-switcher" aria-label="Week switcher">
+  <ul>
+    {% for w_season, w_week in all_weeks %}
+    <li>
+      <a href="{{ asset_prefix }}{{ w_season }}/week-{{ '%02d'|format(w_week) }}.html"
+         {% if (w_season, w_week) == current_week %}aria-current="page" class="active"{% endif %}>
+        Week {{ w_week }}
+      </a>
+    </li>
+    {% endfor %}
+  </ul>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="week-page">
+  <div class="week-heading">
+    <h1>Week {{ week }} <span class="week-heading-conf">&middot; Big Ten &middot; {{ season }}</span></h1>
+    {% if last_collected_display %}
+    <p class="collected-at">Last updated {{ last_collected_display }}</p>
+    {% endif %}
+  </div>
+
+  <div class="game-grid">
+    {% for card in cards %}
+    <article class="game-card" id="game-{{ card.id }}">
+      <header class="game-card-header">
+        <div class="matchup">
+          <div class="team team-away">
+            <img class="team-logo" src="{{ card.away_logo_url or '' }}" alt="{{ card.away_school }} logo" loading="lazy">
+            <span class="team-name">{{ card.away_school }}</span>
+          </div>
+          <span class="matchup-at">@</span>
+          <div class="team team-home">
+            <img class="team-logo" src="{{ card.home_logo_url or '' }}" alt="{{ card.home_school }} logo" loading="lazy">
+            <span class="team-name">{{ card.home_school }}</span>
+            <span class="home-marker" title="Home team">HOME</span>
+          </div>
+        </div>
+        <div class="game-meta">
+          <span class="kickoff">{{ card.start_date|eastern_kickoff }}</span>
+          {% if card.tv %}<span class="tv">{{ card.tv }}</span>{% endif %}
+          {% if card.neutral_site %}<span class="neutral-badge">Neutral site</span>{% endif %}
+          {% if card.venue %}<span class="venue">{{ card.venue }}</span>{% endif %}
+        </div>
+      </header>
+
+      <p class="game-card-headline">{{ card.headline }}</p>
+
+      <div class="table-scroll">
+        <table class="model-table">
+          <thead>
+            <tr>
+              <th scope="col">Source</th>
+              <th scope="col" class="num">Margin (home)</th>
+              <th scope="col" class="num">Home win %</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in card.model_rows %}
+            <tr class="model-row">
+              <th scope="row"><a href="{{ row.homepage_url }}" rel="noopener">{{ row.name }}</a></th>
+              <td class="num tabular">
+                {{ row.margin_display }}
+                {% if row.divergence is not none %}
+                <span class="divergence-chip">{{ '%+.1f'|format(row.divergence) }} vs market</span>
+                {% endif %}
+              </td>
+              <td class="num tabular">{{ row.win_prob_display }}</td>
+            </tr>
+            {% endfor %}
+            {% for row in card.market_rows %}
+            <tr class="market-row">
+              <th scope="row">{{ row.provider }}</th>
+              <td class="num tabular">{{ row.margin_display }}</td>
+              <td class="num tabular">{{ row.win_prob_display }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      {% if card.summary %}
+      <div class="summary-block">
+        {% if card.summary.generated_by == 'llm' %}
+        <p class="ai-label">AI-generated &mdash; verify before acting</p>
+        {% endif %}
+        <div class="summary-body">{{ card.summary.html|safe }}</div>
+        {% if card.summary.sources %}
+        <ul class="summary-sources">
+          {% for s in card.summary.sources %}
+          <li><a href="{{ s.url }}" rel="noopener">{{ s.title }}</a>{% if s.outlet %} &mdash; {{ s.outlet }}{% endif %}</li>
+          {% endfor %}
+        </ul>
+        {% endif %}
+      </div>
+      {% endif %}
+    </article>
+    {% endfor %}
+  </div>
+
+  <section class="feedback-form" aria-labelledby="feedback-heading">
+    <h2 id="feedback-heading">Reader feedback and corrections</h2>
+    <p>See a number that looks wrong, or a summary that needs a fix? Tell us.</p>
+    <form action="https://formspree.io/f/YOUR_FORM_ID" method="POST">
+      <div class="form-row">
+        <label for="fb-name">Name</label>
+        <input id="fb-name" name="name" type="text" autocomplete="name">
+      </div>
+      <div class="form-row">
+        <label for="fb-email">Email</label>
+        <input id="fb-email" name="email" type="email" autocomplete="email">
+      </div>
+      <div class="form-row">
+        <label for="fb-message">Message</label>
+        <textarea id="fb-message" name="message" rows="4" required></textarea>
+      </div>
+      <button type="submit">Send</button>
+    </form>
+  </section>
+</div>
+{% endblock %}

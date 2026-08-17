@@ -1,0 +1,575 @@
+/* APSN Big Ten Weekly
+   Direction: near-black ground, red as accent only (rules, active states,
+   divergence chips). The wordmark's forward shear is echoed exactly once,
+   structurally, via --skew below -- used on the header rule, the active
+   week-switcher tab, and divergence chips. Nowhere else. */
+
+@import url('https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+  --bg: #101012;
+  --bg-elevated: #1a1a1d;
+  --bg-elevated-2: #202024;
+  --border: rgba(255, 255, 255, 0.09);
+  --text: #f2f1ee;
+  --text-dim: #a8a6a2;
+  --text-faint: #706e6b;
+  --red: #cd242e;
+  --red-bright: #ff4757;
+  --red-wash: rgba(205, 36, 46, 0.14);
+  --focus: #ff4757;
+  --skew: -10deg;
+  --radius: 12px;
+  --radius-sm: 6px;
+  --font-display: 'Big Shoulders Display', 'Arial Narrow', sans-serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--bg);
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+a {
+  color: inherit;
+}
+
+a:hover {
+  text-decoration-thickness: 2px;
+}
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  background: var(--red);
+  color: #fff;
+  padding: 0.75em 1.25em;
+  z-index: 100;
+  font-weight: 600;
+}
+
+.skip-link:focus {
+  left: 0.5rem;
+  top: 0.5rem;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* ---------- header ---------- */
+
+.site-header {
+  border-bottom: 1px solid var(--border);
+  position: relative;
+}
+
+.site-header::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 3px;
+  background: var(--red);
+  transform-origin: left;
+  transform: skewX(var(--skew));
+  width: 6rem;
+}
+
+.site-header-inner {
+  max-width: 74rem;
+  margin: 0 auto;
+  padding: 0.85rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  text-decoration: none;
+  color: var(--text);
+}
+
+.brand-logo {
+  height: 1.9rem;
+  width: auto;
+}
+
+.brand-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.25rem;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+}
+
+.week-switcher {
+  overflow-x: auto;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.week-switcher ul {
+  list-style: none;
+  display: flex;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+}
+
+.week-switcher a {
+  position: relative;
+  display: inline-block;
+  padding: 0.4rem 0.75rem;
+  text-decoration: none;
+  color: var(--text-dim);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  transition: color 0.15s ease;
+}
+
+.week-switcher a:hover {
+  color: var(--text);
+}
+
+.week-switcher a.active {
+  color: var(--text);
+}
+
+.week-switcher a.active::after {
+  content: '';
+  position: absolute;
+  left: 0.75rem;
+  right: 0.75rem;
+  bottom: -3px;
+  height: 3px;
+  background: var(--red);
+  transform: skewX(var(--skew));
+}
+
+/* ---------- page body ---------- */
+
+main {
+  max-width: 74rem;
+  margin: 0 auto;
+  padding: 1.25rem 1rem 3rem;
+}
+
+.week-heading {
+  margin-bottom: 1.5rem;
+}
+
+.week-heading h1 {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(2rem, 6vw, 2.75rem);
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  margin: 0 0 0.25rem;
+}
+
+.week-heading-conf {
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+.collected-at {
+  color: var(--text-faint);
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.game-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+@media (min-width: 720px) {
+  .game-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1180px) {
+  .game-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* ---------- game card ---------- */
+
+.game-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.game-card-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.matchup {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.team {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.team-home {
+  flex-direction: row-reverse;
+  text-align: right;
+  justify-content: flex-start;
+}
+
+.team-logo {
+  width: 2rem;
+  height: 2rem;
+  object-fit: contain;
+  flex: none;
+}
+
+.team-name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.05rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.matchup-at {
+  color: var(--text-faint);
+  font-size: 0.85rem;
+  flex: none;
+}
+
+.home-marker {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--red);
+  border: 1px solid var(--red);
+  border-radius: 3px;
+  padding: 0.05rem 0.3rem;
+  flex: none;
+}
+
+.game-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+.game-meta .neutral-badge {
+  color: var(--red-bright);
+  font-weight: 600;
+}
+
+.game-card-headline {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.3rem;
+  margin: 0;
+  color: var(--text);
+}
+
+/* ---------- model table ---------- */
+
+.table-scroll {
+  overflow-x: auto;
+  margin: 0 -1rem;
+  padding: 0 1rem;
+}
+
+.model-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+  min-width: 280px;
+}
+
+.model-table th,
+.model-table td {
+  padding: 0.4rem 0.5rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.model-table thead th {
+  color: var(--text-faint);
+  font-weight: 600;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.model-table .num {
+  text-align: right;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+}
+
+.model-table tbody th {
+  font-weight: 500;
+}
+
+.model-table tbody th a {
+  text-decoration: none;
+  border-bottom: 1px dotted var(--text-faint);
+}
+
+.model-table tbody th a:hover {
+  border-bottom-color: var(--text);
+}
+
+.model-row td,
+.model-row th {
+  background: transparent;
+}
+
+.market-row td,
+.market-row th {
+  background: var(--red-wash);
+}
+
+.market-row th {
+  font-weight: 600;
+}
+
+.model-table tbody tr:last-child td,
+.model-table tbody tr:last-child th {
+  border-bottom: none;
+}
+
+.divergence-chip {
+  display: inline-block;
+  margin-left: 0.4rem;
+  padding: 0.08rem 0.45rem;
+  background: var(--red);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+}
+
+/* ---------- summary block ---------- */
+
+.summary-block {
+  border-top: 1px solid var(--border);
+  padding-top: 0.75rem;
+  font-size: 0.9rem;
+  color: var(--text-dim);
+}
+
+.summary-body p {
+  margin: 0 0 0.6rem;
+}
+
+.summary-body p:last-child {
+  margin-bottom: 0;
+}
+
+.ai-label {
+  display: inline-block;
+  margin: 0 0 0.5rem;
+  padding: 0.15rem 0.5rem;
+  border: 1px solid var(--red-bright);
+  color: var(--red-bright);
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-radius: var(--radius-sm);
+}
+
+.summary-sources {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  font-size: 0.8rem;
+}
+
+.summary-sources li {
+  margin-bottom: 0.2rem;
+}
+
+.summary-sources a {
+  color: var(--text-dim);
+  text-decoration: underline;
+  text-decoration-color: var(--text-faint);
+}
+
+.summary-sources a:hover {
+  color: var(--text);
+}
+
+/* ---------- feedback form ---------- */
+
+.feedback-form {
+  margin-top: 2.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+  max-width: 30rem;
+}
+
+.feedback-form h2 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.3rem;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  margin: 0 0 0.25rem;
+}
+
+.feedback-form > p {
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  margin: 0 0 1rem;
+}
+
+.form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-bottom: 0.85rem;
+}
+
+.form-row label {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+.form-row input,
+.form-row textarea {
+  background: var(--bg-elevated-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  padding: 0.55rem 0.7rem;
+  resize: vertical;
+}
+
+.form-row input:focus,
+.form-row textarea:focus {
+  border-color: var(--red);
+}
+
+.feedback-form button {
+  background: var(--red);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0.6rem 1.5rem;
+  cursor: pointer;
+}
+
+.feedback-form button:hover {
+  background: var(--red-bright);
+}
+
+/* ---------- footer ---------- */
+
+.site-footer {
+  max-width: 74rem;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 3rem;
+  color: var(--text-faint);
+  font-size: 0.8rem;
+  border-top: 1px solid var(--border);
+}
+
+.site-footer a {
+  color: var(--text-dim);
+  text-decoration: underline;
+}
+
+.site-footer a:hover {
+  color: var(--text);
+}
+
+.site-footer p {
+  margin: 0 0 0.4rem;
+}
+
+/* ---------- motion & scroll affordance ---------- */
+
+@media (prefers-reduced-motion: no-preference) {
+  .week-switcher a,
+  a {
+    transition: color 0.15s ease;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+.table-scroll.has-overflow {
+  background:
+    linear-gradient(to right, var(--bg-elevated) 0%, transparent 2%),
+    linear-gradient(to left, var(--bg-elevated) 0%, transparent 8%);
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+}
