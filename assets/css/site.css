@@ -680,6 +680,14 @@ main {
   margin: 0 0 1.5rem;
 }
 
+.rankings-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--card-shadow);
+  padding: 1rem;
+}
+
 .rankings-table {
   width: 100%;
   border-collapse: collapse;
