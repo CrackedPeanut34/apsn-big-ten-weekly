@@ -454,10 +454,12 @@ main {
   color: var(--text-faint);
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  padding: 0.35rem 0.5rem;
+  letter-spacing: 0.05em;
+  padding: 0.7rem 0.5rem;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
 }
 
 .model-table tbody tr:last-child td,
