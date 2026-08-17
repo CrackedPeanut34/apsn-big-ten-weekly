@@ -28,10 +28,10 @@ GAME_ROW = {
     "away_points": None,
     "home_school": "Ohio State", "home_abbr": "OSU",
     "home_logo_url": "https://a/light.png", "home_logo_dark_url": "https://a/dark.png",
-    "home_color": "#BB0000", "home_alt_color": "#000000",
+    "home_color": "#BB0000", "home_alt_color": "#000000", "home_conference": "Big Ten",
     "away_school": "Indiana", "away_abbr": "IU",
     "away_logo_url": "https://b/light.png", "away_logo_dark_url": None,
-    "away_color": "#990000", "away_alt_color": "#FFFFFF",
+    "away_color": "#990000", "away_alt_color": "#FFFFFF", "away_conference": "Big Ten",
 }
 
 MODEL_SOURCES = [

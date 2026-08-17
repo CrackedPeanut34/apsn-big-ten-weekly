@@ -81,9 +81,11 @@ def fetch_week_games(conn, season: int, week: int) -> list[dict]:
                    ht.school AS home_school, ht.abbreviation AS home_abbr,
                    ht.logo_url AS home_logo_url, ht.logo_dark_url AS home_logo_dark_url,
                    ht.color AS home_color, ht.alt_color AS home_alt_color,
+                   ht.conference AS home_conference,
                    at.school AS away_school, at.abbreviation AS away_abbr,
                    at.logo_url AS away_logo_url, at.logo_dark_url AS away_logo_dark_url,
-                   at.color AS away_color, at.alt_color AS away_alt_color
+                   at.color AS away_color, at.alt_color AS away_alt_color,
+                   at.conference AS away_conference
             FROM games g
             JOIN teams ht ON ht.id = g.home_team_id
             JOIN teams at ON at.id = g.away_team_id
@@ -309,10 +311,14 @@ def render_week(conn, env: Environment, season: int, week: int, all_weeks: list[
     cards.sort(key=lambda c: c["sort_key"])
 
     teams_seen = {}
-    for c in cards:
+    for g in games:
         for prefix in ("home", "away"):
-            school = c[f"{prefix}_school"]
-            teams_seen.setdefault(school, {"school": school, "logo_url": c[f"{prefix}_logo_url"]})
+            # teams.conference stores CFBD's display name ("Big Ten"), not
+            # the "B1G" query-filter code config.CONFERENCE holds.
+            if g[f"{prefix}_conference"] != "Big Ten":
+                continue
+            school = g[f"{prefix}_school"]
+            teams_seen.setdefault(school, {"school": school, "logo_url": g[f"{prefix}_logo_url"]})
     teams = sorted(teams_seen.values(), key=lambda t: t["school"])
 
     last_collected_display = None
