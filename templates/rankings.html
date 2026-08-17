@@ -11,10 +11,10 @@
   </div>
 
   <p class="rankings-intro">
-    Every Big Ten team's current rating from each source, side by side --
-    never averaged into one number. Click a column to sort by it; click
-    again to flip direction. Teams a source hasn't rated yet sort to the
-    bottom.
+    Every Big Ten team's record and current rating from each source, side
+    by side -- never averaged into one number. Sorted by FPI by default;
+    click any column to sort by it instead, click again to flip direction.
+    Teams a source hasn't rated yet sort to the bottom.
   </p>
 
   <div class="table-scroll">
@@ -22,8 +22,9 @@
       <thead>
         <tr>
           <th scope="col" data-sort-key="school">Team</th>
+          <th scope="col" class="num" data-sort-key="record">Record</th>
           {% for s in sources %}
-          <th scope="col" class="num" data-sort-key="{{ s.slug }}">
+          <th scope="col" class="num{% if s.slug == 'fpi' %} sorted-desc{% endif %}" data-sort-key="{{ s.slug }}">
             <a href="#glossary-{{ s.slug }}">{{ s.name }}</a>
           </th>
           {% endfor %}
@@ -36,6 +37,9 @@
             <img class="team-logo-sm" src="{{ t.logo_url or '' }}" alt="" loading="lazy">
             {{ t.school }}
           </th>
+          <td class="num tabular" data-sort-cell="record" data-value="{{ '' if t.record_value is none else t.record_value }}">
+            {{ t.record_display }}
+          </td>
           {% for cell in t.cells %}
           <td class="num tabular" data-sort-cell="{{ cell.slug }}" data-value="{{ '' if cell.value is none else cell.value }}">
             {{ cell.display }}

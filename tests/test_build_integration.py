@@ -41,6 +41,9 @@ MODEL_SOURCES = [
     {"id": 2, "name": "SRS", "slug": "srs", "homepage_url": "https://cfbd.com/srs",
      "output_type": "power_rating", "hfa": Decimal("2.5"), "active": True,
      "notes": "Test note for SRS."},
+    {"id": 3, "name": "FPI", "slug": "fpi", "homepage_url": "https://espn.com/fpi",
+     "output_type": "power_rating", "hfa": Decimal("2.5"), "active": True,
+     "notes": "Test note for FPI."},
 ]
 
 # SP+ has a real row; SRS has none for this game -> must render as em dash.
@@ -60,12 +63,18 @@ TEAMS = [
     {"id": 2, "school": "Indiana", "logo_url": "https://b/light.png"},
 ]
 
-# Only SP+ has a team_ratings row -- SRS must render as em dash on the
-# rankings page too, same as it does per-game.
+# Only SP+ and FPI have team_ratings rows -- SRS must render as em dash on
+# the rankings page too, same as it does per-game. Indiana's FPI (5.0) is
+# lower than Ohio State's (20.0) despite sorting first alphabetically, so
+# the default-sort tests can tell "sorted by FPI" apart from "alphabetical".
 TEAM_RATINGS = [
     {"team_id": 1, "model_source_id": 1, "raw_value": Decimal("25.0"),
      "collected_at": dt.datetime(2026, 8, 27, 10, 0, tzinfo=dt.timezone.utc)},
     {"team_id": 2, "model_source_id": 1, "raw_value": Decimal("10.0"),
+     "collected_at": dt.datetime(2026, 8, 27, 10, 0, tzinfo=dt.timezone.utc)},
+    {"team_id": 1, "model_source_id": 3, "raw_value": Decimal("20.0"),
+     "collected_at": dt.datetime(2026, 8, 27, 10, 0, tzinfo=dt.timezone.utc)},
+    {"team_id": 2, "model_source_id": 3, "raw_value": Decimal("5.0"),
      "collected_at": dt.datetime(2026, 8, 27, 10, 0, tzinfo=dt.timezone.utc)},
 ]
 
@@ -102,6 +111,10 @@ class FakeCursor:
             self._result = ("all", TEAMS)
         elif "FROM team_ratings tr" in n:
             self._result = ("all", TEAM_RATINGS)
+        elif "GROUP BY t.id" in n:
+            # GAME_ROW is unplayed (points still None) -> both teams 0-0.
+            self._result = ("all", [{"team_id": 1, "wins": 0, "losses": 0},
+                                     {"team_id": 2, "wins": 0, "losses": 0}])
         else:
             raise AssertionError(f"unexpected SQL: {n[:100]}")
 
@@ -201,13 +214,31 @@ def test_rankings_page_written_with_both_teams_and_sources(wired, monkeypatch):
 
 
 def test_rankings_page_em_dashes_a_source_with_no_team_rating(wired, monkeypatch):
-    # Only SP+ has team_ratings rows in the fixture -- SRS must not silently
-    # drop its column or show a bare 0.
+    # Only SP+ and FPI have team_ratings rows in the fixture -- SRS must not
+    # silently drop its column or show a bare 0.
     monkeypatch.setattr("sys.argv", ["build.py"])
     build.main()
     html = (wired / "site" / str(SEASON) / "rankings.html").read_text()
-    srs_col_start = html.index("SRS")
-    assert "—" in html[srs_col_start:srs_col_start + 600]
+    srs_cell_start = html.index('data-sort-cell="srs"')
+    assert "—" in html[srs_cell_start:srs_cell_start + 150]
+
+
+def test_rankings_page_sorted_by_fpi_not_alphabetically(wired, monkeypatch):
+    # Ohio State's FPI (20.0) beats Indiana's (5.0), so it must render first
+    # even though "Indiana" sorts first alphabetically.
+    monkeypatch.setattr("sys.argv", ["build.py"])
+    build.main()
+    html = (wired / "site" / str(SEASON) / "rankings.html").read_text()
+    assert html.index("Ohio State") < html.index("Indiana")
+
+
+def test_rankings_page_shows_win_loss_record(wired, monkeypatch):
+    # GAME_ROW hasn't been played (points still None) -> both teams 0-0.
+    monkeypatch.setattr("sys.argv", ["build.py"])
+    build.main()
+    html = (wired / "site" / str(SEASON) / "rankings.html").read_text()
+    assert "Record" in html
+    assert "0-0" in html
 
 
 def test_rankings_nav_link_appears_on_week_page(wired, monkeypatch):

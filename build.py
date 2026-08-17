@@ -211,6 +211,37 @@ def fetch_latest_odds(conn, game_ids: list[int]) -> dict[int, list[dict]]:
     return result
 
 
+def fetch_team_records(conn, season: int) -> dict[int, tuple[int, int]]:
+    """Wins/losses per Big Ten team, straight from games already collected --
+    no new data source. Counts every played game (home_points/away_points
+    both set), conference or not, so it updates on its own as collect.py
+    picks up new results week over week; nothing to maintain by hand."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT
+                t.id AS team_id,
+                COUNT(*) FILTER (
+                    WHERE (g.home_team_id = t.id AND g.home_points > g.away_points)
+                       OR (g.away_team_id = t.id AND g.away_points > g.home_points)
+                ) AS wins,
+                COUNT(*) FILTER (
+                    WHERE (g.home_team_id = t.id AND g.home_points < g.away_points)
+                       OR (g.away_team_id = t.id AND g.away_points < g.home_points)
+                ) AS losses
+            FROM teams t
+            LEFT JOIN games g
+                ON (g.home_team_id = t.id OR g.away_team_id = t.id)
+                AND g.season = %(season)s
+                AND g.home_points IS NOT NULL AND g.away_points IS NOT NULL
+            WHERE t.conference = 'Big Ten'
+            GROUP BY t.id
+            """,
+            {"season": season},
+        )
+        return {row["team_id"]: (row["wins"], row["losses"]) for row in cur.fetchall()}
+
+
 def fetch_team_ratings(conn, season: int) -> tuple[list[dict], list[dict]]:
     """Latest team_ratings row per (team, model_source) for every Big Ten
     team, for every active power-rating source. CFBD Pregame Win Probability
@@ -239,9 +270,11 @@ def fetch_team_ratings(conn, season: int) -> tuple[list[dict], list[dict]]:
         )
         latest = cur.fetchall()
 
+    records = fetch_team_records(conn, season)
     by_team_and_source = {(r["team_id"], r["model_source_id"]): r for r in latest}
     rows = []
     for team in teams:
+        wins, losses = records.get(team["id"], (0, 0))
         cells = []
         for source in sources:
             r = by_team_and_source.get((team["id"], source["id"]))
@@ -252,7 +285,13 @@ def fetch_team_ratings(conn, season: int) -> tuple[list[dict], list[dict]]:
                 "value": value,
                 "display": fmt.format(value) if value is not None else "—",
             })
-        rows.append({"school": team["school"], "logo_url": team["logo_url"], "cells": cells})
+        rows.append({
+            "school": team["school"],
+            "logo_url": team["logo_url"],
+            "record_display": f"{wins}-{losses}",
+            "record_value": wins / (wins + losses) if (wins + losses) > 0 else None,
+            "cells": cells,
+        })
     return rows, sources
 
 
@@ -472,7 +511,14 @@ def render_rankings(conn, env: Environment, season: int, all_weeks: list[tuple[i
         {**s, "description": GLOSSARY_DESCRIPTIONS.get(s["slug"])} for s in sources
     ]
 
-    teams.sort(key=lambda t: t["school"])  # default order; JS sorts client-side from here
+    def fpi_sort_key(team):
+        fpi_cell = next((c for c in team["cells"] if c["slug"] == "fpi"), None)
+        value = fpi_cell["value"] if fpi_cell else None
+        return (value is None, -(value or 0), team["school"])
+
+    # Highest FPI first by default; teams FPI hasn't rated sort last. Table
+    # is still fully sortable client-side by clicking any column header.
+    teams.sort(key=fpi_sort_key)
 
     template = env.get_template("rankings.html")
     html = template.render(
