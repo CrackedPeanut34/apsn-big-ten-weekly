@@ -31,8 +31,9 @@ outlet with an inline link. What's at stake. The one thing worth watching.
 Rules the build enforces (`build.py:parse_summary`), not just convention:
 
 - `status: draft` never renders on the site. Only `status: published` does.
-  This is the gate for the future LLM-generated path in `summarize/` --
-  drafts stay invisible until a human flips the status.
+  This is the gate for the LLM-generated path in `summarize/generate.py` --
+  drafts stay invisible until a human flips the status (or the script is
+  run with `--publish`).
 - `generated_by` defaults to `human` if omitted. Set it to `llm` and the
   card gets a visible "AI-generated, verify before acting" label -- it does
   not change whether the card renders, only how it's labeled.

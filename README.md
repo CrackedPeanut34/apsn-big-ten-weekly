@@ -22,13 +22,16 @@ framework.
 2. **Supabase project.** Create a free-tier project, grab the Postgres
    connection string (Project Settings → Database → Connection string,
    "URI" format) as `DATABASE_URL`.
-3. **Local env:**
+3. **(Optional) Anthropic API key.** Only needed for LLM-drafted previews
+   (`summarize/generate.py`) -- get one at console.anthropic.com. Not
+   required for collect/build/deploy.
+4. **Local env:**
    ```
    python3 -m venv .venv && source .venv/bin/activate
    pip install -r requirements.txt
-   cp .env.example .env   # fill in CFBD_API_KEY and DATABASE_URL
+   cp .env.example .env   # fill in CFBD_API_KEY, DATABASE_URL, and (optionally) ANTHROPIC_API_KEY
    ```
-4. **Apply the schema:** `python migrate.py`
+5. **Apply the schema:** `python migrate.py`
 
 ## Running it locally
 
@@ -40,6 +43,9 @@ python build.py                  # builds the current week
 python build.py --all-weeks      # rebuilds every week in the DB
 
 python -m http.server --directory site 8000   # preview at localhost:8000
+
+# LLM-drafted previews (off by default -- see "Writing summaries")
+python -m summarize.generate --season 2026 --week 1
 ```
 
 Both scripts are safe to re-run. `collect.py` only ever inserts new
@@ -89,6 +95,34 @@ Markdown files, not database rows -- see `content/summaries/README.md` for
 the format and the rules the build enforces (`status: draft` never
 renders; `generated_by: llm` gets a visible AI-generated label).
 
+Two ways to fill them in:
+
+- **By hand.** Write the file directly -- see the format doc above.
+- **LLM-drafted.** `summarize/generate.py` makes one Claude API call per
+  game (model set by `LLM_SUMMARY_MODEL`, defaults to `claude-opus-5`),
+  with the `web_search` tool enabled so the model grounds the preview in
+  real search results instead of inventing one, constrained to a JSON
+  schema so only URLs it actually found end up in `sources`. It writes
+  `status: draft` by default -- invisible on the site until a human flips
+  it to `published` (edit the file, or rerun with `--publish`).
+
+  **Kill switch:** the script refuses to run -- no DB connection, no API
+  call -- unless `LLM_SUMMARIES_ENABLED=true` is set. It's unset by
+  default, so nothing runs until you opt in. To turn it off again, unset
+  it or set it to anything else, locally in `.env` or as a GitHub Actions
+  repo variable if this ever gets wired into a workflow (it isn't, yet --
+  it's a manual/on-demand script).
+
+  ```
+  python -m summarize.generate --season 2026 --week 1              # drafts only
+  python -m summarize.generate --season 2026 --week 1 --publish     # goes live immediately
+  python -m summarize.generate --season 2026 --week 1 --game-id 401628455   # one game
+  ```
+
+  Existing files are never overwritten unless `--force` is passed, and a
+  human-authored file (`generated_by: human`, or omitted) is never
+  overwritten even with `--force`.
+
 ## Submission form
 
 `templates/week.html` posts to a Formspree form (`formspree.io/f/mkjwqjqe`).
@@ -107,8 +141,8 @@ db/migrations/         append-only numbered SQL migrations
 templates/              Jinja2 templates
 assets/                  CSS, JS, logo, favicon
 content/summaries/      hand-written per-game markdown
-summarize/generate.py   LLM summary seam, NotImplementedError in v1
-tests/                   50 tests, see "Tests" above
+summarize/generate.py   LLM-drafted previews, web_search-grounded, gated by LLM_SUMMARIES_ENABLED
+tests/                   52 tests, see "Tests" above
 .github/workflows/      deploy.yml (collect+build+deploy), test.yml (CI)
 ```
 
