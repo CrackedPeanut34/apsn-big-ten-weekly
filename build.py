@@ -93,19 +93,36 @@ def log(msg: str) -> None:
     print(f"[build] {msg}", flush=True)
 
 
+def week_filename(week: int, season_type: str) -> str:
+    """Regular-season URLs stay exactly as they've always been
+    (week-01.html); postseason weeks get a distinguishing prefix so a
+    postseason week 1 (bowls restart week numbering from 1, same as the
+    regular season does) can never collide with -- and silently overwrite
+    -- the real regular-season week 1 page."""
+    prefix = "" if season_type == "regular" else f"{season_type}-"
+    return f"{prefix}week-{week:02d}.html"
+
+
+def rankings_filename(week: int, season_type: str) -> str:
+    prefix = "" if season_type == "regular" else f"{season_type}-"
+    return f"{prefix}rankings-week-{week:02d}.html"
+
+
 # --- DB reads ----------------------------------------------------------------
 
-def determine_default_week(conn) -> tuple[int, int]:
-    """Picks the most relevant (season, week) already in the DB: the
-    most-recently-started week that has kicked off, or if the season hasn't
-    started yet, the earliest upcoming week."""
+def determine_default_week(conn) -> tuple[int, int, str]:
+    """Picks the most relevant (season, week, season_type) already in the
+    DB: the most-recently-started week that has kicked off, or if the
+    season hasn't started yet, the earliest upcoming week. Compares by
+    actual kickoff date rather than week number, since postseason week
+    numbers restart from 1 and would otherwise look "earlier" than a late
+    regular-season week."""
     with conn.cursor() as cur:
         cur.execute(
             """
-            SELECT season, week, min(start_date) AS week_start
+            SELECT season, week, season_type, min(start_date) AS week_start
             FROM games
-            GROUP BY season, week
-            ORDER BY season DESC, week ASC
+            GROUP BY season, week, season_type
             """
         )
         rows = cur.fetchall()
@@ -113,25 +130,32 @@ def determine_default_week(conn) -> tuple[int, int]:
     if not rows:
         raise RuntimeError("no games in the database -- run collect.py first")
 
-    latest_season = rows[0]["season"]
+    latest_season = max(r["season"] for r in rows)
     season_rows = [r for r in rows if r["season"] == latest_season]
     now = dt.datetime.now(dt.timezone.utc)
 
     past_or_current = [r for r in season_rows if r["week_start"] and r["week_start"] <= now]
     if past_or_current:
-        chosen = max(past_or_current, key=lambda r: r["week"])
+        chosen = max(past_or_current, key=lambda r: r["week_start"])
     else:
-        chosen = season_rows[0]
-    return chosen["season"], chosen["week"]
+        upcoming = [r for r in season_rows if r["week_start"]]
+        chosen = min(upcoming, key=lambda r: r["week_start"]) if upcoming else season_rows[0]
+    return chosen["season"], chosen["week"], chosen["season_type"]
 
 
-def list_all_weeks(conn) -> list[tuple[int, int]]:
+def list_all_weeks(conn) -> list[tuple[int, int, str]]:
     with conn.cursor() as cur:
-        cur.execute("SELECT DISTINCT season, week FROM games ORDER BY season, week")
-        return [(r["season"], r["week"]) for r in cur.fetchall()]
+        cur.execute(
+            """
+            SELECT DISTINCT season, week, season_type, (season_type = 'postseason') AS is_postseason
+            FROM games
+            ORDER BY season, is_postseason, week
+            """
+        )
+        return [(r["season"], r["week"], r["season_type"]) for r in cur.fetchall()]
 
 
-def fetch_week_games(conn, season: int, week: int) -> list[dict]:
+def fetch_week_games(conn, season: int, week: int, season_type: str) -> list[dict]:
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -147,10 +171,10 @@ def fetch_week_games(conn, season: int, week: int) -> list[dict]:
             FROM games g
             JOIN teams ht ON ht.id = g.home_team_id
             JOIN teams at ON at.id = g.away_team_id
-            WHERE g.season = %(season)s AND g.week = %(week)s
+            WHERE g.season = %(season)s AND g.week = %(week)s AND g.season_type = %(season_type)s
             ORDER BY g.start_date
             """,
-            {"season": season, "week": week},
+            {"season": season, "week": week, "season_type": season_type},
         )
         return cur.fetchall()
 
@@ -263,33 +287,37 @@ def compute_national_ranks(latest: list[dict]) -> dict[tuple[int, int], int]:
     return national_rank
 
 
-def fetch_ap_ranks(conn, season: int, week: int) -> dict[int, int]:
+def fetch_ap_ranks(conn, season: int, week: int, season_type: str) -> dict[int, int]:
     """team_id -> AP Top 25 rank, as of this week specifically -- same week-
-    pinning as team_ratings (0004_week_scoped_rankings.sql), so a team's
-    rank here never changes once a later week's poll has its own rows.
-    Shared by the rankings table and by game cards (rank badge next to each
-    team's logo), so there's exactly one query for "this week's AP rank."""
+    and season_type-pinning as team_ratings (0004_week_scoped_rankings.sql,
+    0005_season_type_scoped_ratings.sql), so a team's rank here never
+    changes once a later week's poll has its own rows -- including a
+    postseason week reusing a regular-season week number. Shared by the
+    rankings table and by game cards (rank badge next to each team's
+    logo), so there's exactly one query for "this week's AP rank."""
     with conn.cursor() as cur:
         cur.execute(
             """
             SELECT DISTINCT ON (pr.team_id)
                    pr.team_id, pr.poll_rank
             FROM poll_rankings pr
-            WHERE pr.season = %(season)s AND pr.week = %(week)s AND pr.poll = %(poll)s
+            WHERE pr.season = %(season)s AND pr.week = %(week)s
+              AND pr.season_type = %(season_type)s AND pr.poll = %(poll)s
             ORDER BY pr.team_id, pr.collected_at DESC
             """,
-            {"season": season, "week": week, "poll": "AP Top 25"},
+            {"season": season, "week": week, "season_type": season_type, "poll": "AP Top 25"},
         )
         return {row["team_id"]: row["poll_rank"] for row in cur.fetchall()}
 
 
-def fetch_team_ratings(conn, season: int, week: int) -> tuple[list[dict], list[dict]]:
+def fetch_team_ratings(conn, season: int, week: int, season_type: str) -> tuple[list[dict], list[dict]]:
     """Every Big Ten team's rating from every active power-rating source, as
-    of one specific week -- pinned there forever by week (0004_week_scoped_
-    rankings.sql), same as a game's odds/predictions never drift once
-    collected. CFBD Pregame Win Probability is excluded -- it isn't a
-    standalone team rating, it's a per-game output (see build_game_card's
-    model_rows for that one instead)."""
+    of one specific week -- pinned there forever by week and season_type
+    (0004_week_scoped_rankings.sql, 0005_season_type_scoped_ratings.sql),
+    same as a game's odds/predictions never drift once collected. CFBD
+    Pregame Win Probability is excluded -- it isn't a standalone team
+    rating, it's a per-game output (see build_game_card's model_rows for
+    that one instead)."""
     with conn.cursor() as cur:
         cur.execute(
             "SELECT * FROM model_sources WHERE active = TRUE AND output_type = 'power_rating' ORDER BY id"
@@ -310,14 +338,14 @@ def fetch_team_ratings(conn, season: int, week: int) -> tuple[list[dict], list[d
             SELECT DISTINCT ON (tr.team_id, tr.model_source_id)
                    tr.*
             FROM team_ratings tr
-            WHERE tr.season = %(season)s AND tr.week = %(week)s
+            WHERE tr.season = %(season)s AND tr.week = %(week)s AND tr.season_type = %(season_type)s
             ORDER BY tr.team_id, tr.model_source_id, tr.collected_at DESC
             """,
-            {"season": season, "week": week},
+            {"season": season, "week": week, "season_type": season_type},
         )
         latest = cur.fetchall()
 
-    ap_rank_by_team = fetch_ap_ranks(conn, season, week)
+    ap_rank_by_team = fetch_ap_ranks(conn, season, week, season_type)
     national_rank = compute_national_ranks(latest)
     records = fetch_team_records(conn, season)
     by_team_and_source = {(r["team_id"], r["model_source_id"]): r for r in latest}
@@ -522,16 +550,17 @@ def build_game_card(game: dict, predictions: list[dict], odds: list[dict],
     }
 
 
-def render_week(conn, env: Environment, season: int, week: int, all_weeks: list[tuple[int, int]]) -> None:
-    games = fetch_week_games(conn, season, week)
+def render_week(conn, env: Environment, season: int, week: int, season_type: str,
+                 all_weeks: list[tuple[int, int, str]]) -> None:
+    games = fetch_week_games(conn, season, week, season_type)
     if not games:
-        log(f"no games for {season} week {week}, skipping")
+        log(f"no games for {season} {season_type} week {week}, skipping")
         return
 
     game_ids = [g["id"] for g in games]
     predictions_by_game = fetch_latest_predictions(conn, game_ids)
     odds_by_game = fetch_latest_odds(conn, game_ids)
-    ap_rank_by_team = fetch_ap_ranks(conn, season, week)
+    ap_rank_by_team = fetch_ap_ranks(conn, season, week, season_type)
 
     cards = [
         build_game_card(g, predictions_by_game[g["id"]], odds_by_game[g["id"]], season, week, ap_rank_by_team)
@@ -570,23 +599,25 @@ def render_week(conn, env: Environment, season: int, week: int, all_weeks: list[
         asset_prefix="../",
         season=season,
         week=week,
+        season_type=season_type,
         cards=cards,
         teams=teams,
         glossary_sources=glossary_sources,
         all_weeks=all_weeks,
-        current_week=(season, week),
+        current_week=(season, week, season_type),
         is_rankings=False,
     )
 
     out_dir = SITE_DIR / str(season)
     out_dir.mkdir(parents=True, exist_ok=True)
-    out_path = out_dir / f"week-{week:02d}.html"
+    out_path = out_dir / week_filename(week, season_type)
     out_path.write_text(html)
     log(f"wrote {os.path.relpath(out_path, ROOT)} ({len(cards)} games)")
 
 
-def render_rankings(conn, env: Environment, season: int, week: int, all_weeks: list[tuple[int, int]]) -> None:
-    teams, sources = fetch_team_ratings(conn, season, week)
+def render_rankings(conn, env: Environment, season: int, week: int, season_type: str,
+                     all_weeks: list[tuple[int, int, str]]) -> None:
+    teams, sources = fetch_team_ratings(conn, season, week, season_type)
 
     glossary_sources = [
         {**s, "description": GLOSSARY_DESCRIPTIONS.get(s["slug"])} for s in sources
@@ -606,26 +637,28 @@ def render_rankings(conn, env: Environment, season: int, week: int, all_weeks: l
         asset_prefix="../",
         season=season,
         week=week,
+        season_type=season_type,
         teams=teams,
         sources=sources,
         glossary_sources=glossary_sources,
         all_weeks=all_weeks,
-        current_week=(season, week),
+        current_week=(season, week, season_type),
         is_rankings=True,
     )
 
     out_dir = SITE_DIR / str(season)
     out_dir.mkdir(parents=True, exist_ok=True)
-    out_path = out_dir / f"rankings-week-{week:02d}.html"
+    out_path = out_dir / rankings_filename(week, season_type)
     out_path.write_text(html)
     log(f"wrote {os.path.relpath(out_path, ROOT)} ({len(teams)} teams, {len(sources)} sources)")
 
 
-def render_index(env: Environment, default_season: int, default_week: int) -> None:
+def render_index(env: Environment, default_season: int, default_week: int, default_season_type: str) -> None:
     template = env.get_template("index.html")
-    html = template.render(asset_prefix="", season=default_season, week=default_week)
+    target = week_filename(default_week, default_season_type)
+    html = template.render(asset_prefix="", season=default_season, week_path=target)
     (SITE_DIR / "index.html").write_text(html)
-    log(f"wrote site/index.html -> redirects to {default_season}/week-{default_week:02d}.html")
+    log(f"wrote site/index.html -> redirects to {default_season}/{target}")
 
 
 def copy_assets() -> None:
@@ -640,6 +673,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--year", type=int, default=None)
     parser.add_argument("--week", type=int, default=None)
+    parser.add_argument("--season-type", default="regular")
     parser.add_argument("--all-weeks", action="store_true")
     args = parser.parse_args()
 
@@ -649,6 +683,8 @@ def main() -> int:
         autoescape=select_autoescape(["html"]),
     )
     env.filters["eastern_kickoff"] = eastern_kickoff
+    env.globals["week_filename"] = week_filename
+    env.globals["rankings_filename"] = rankings_filename
 
     conn = db.get_connection()
     try:
@@ -658,18 +694,20 @@ def main() -> int:
             return 1
 
         if args.year and args.week:
-            targets = [(args.year, args.week)]
+            targets = [(args.year, args.week, args.season_type)]
         elif args.all_weeks:
             targets = all_weeks
         else:
             targets = [determine_default_week(conn)]
 
-        for season, week in targets:
-            render_week(conn, env, season, week, all_weeks)
-            render_rankings(conn, env, season, week, all_weeks)
+        for season, week, season_type in targets:
+            render_week(conn, env, season, week, season_type, all_weeks)
+            render_rankings(conn, env, season, week, season_type, all_weeks)
 
-        default_season, default_week = targets[-1] if not args.all_weeks else determine_default_week(conn)
-        render_index(env, default_season, default_week)
+        default_season, default_week, default_season_type = (
+            targets[-1] if not args.all_weeks else determine_default_week(conn)
+        )
+        render_index(env, default_season, default_week, default_season_type)
         copy_assets()
     finally:
         conn.close()

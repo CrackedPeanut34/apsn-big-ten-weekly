@@ -103,11 +103,11 @@ class FakeCursor:
 
     def execute(self, sql, params=None):
         n = " ".join(sql.split())
-        if "GROUP BY season, week" in n:
-            self._result = ("all", [{"season": SEASON, "week": WEEK,
+        if "GROUP BY season, week, season_type" in n:
+            self._result = ("all", [{"season": SEASON, "week": WEEK, "season_type": "regular",
                                       "week_start": GAME_ROW["start_date"]}])
-        elif "SELECT DISTINCT season, week FROM games" in n:
-            self._result = ("all", [{"season": SEASON, "week": WEEK}])
+        elif n.startswith("SELECT DISTINCT season, week, season_type"):
+            self._result = ("all", [{"season": SEASON, "week": WEEK, "season_type": "regular"}])
         elif n.startswith("SELECT g.*"):
             self._result = ("all", [GAME_ROW])
         elif "FROM model_sources WHERE active = TRUE" in n:
@@ -256,6 +256,21 @@ def test_index_redirects_to_the_built_week(wired, monkeypatch):
     build.main()
     index_html = (wired / "site" / "index.html").read_text()
     assert f"{SEASON}/week-{WEEK:02d}.html" in index_html
+
+
+def test_postseason_week_writes_to_a_separate_file_from_regular_week(wired, monkeypatch):
+    # Same season+week number as the regular-season fixture (GAME_ROW is
+    # season=2026, week=1), but a different season_type -- must land on its
+    # own file, never overwrite the real regular-season week 1 page.
+    monkeypatch.setattr("sys.argv", ["build.py", "--year", str(SEASON), "--week", str(WEEK),
+                                      "--season-type", "postseason"])
+    exit_code = build.main()
+    assert exit_code == 0
+
+    postseason_page = wired / "site" / str(SEASON) / "postseason-week-01.html"
+    regular_page = wired / "site" / str(SEASON) / "week-01.html"
+    assert postseason_page.exists()
+    assert not regular_page.exists()
 
 
 RANKINGS_FILENAME = f"rankings-week-{WEEK:02d}.html"

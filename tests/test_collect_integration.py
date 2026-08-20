@@ -7,6 +7,7 @@ This is the test that actually proves the acceptance criterion "killing one
 source's endpoint does not stop the run": it makes cfbd_client.get_srs raise
 and asserts every other source still writes rows and the run still exits 0.
 """
+import datetime as dt
 import json
 from decimal import Decimal
 
@@ -293,6 +294,7 @@ def test_team_ratings_written_for_every_rated_team_regardless_of_opponent(fake_c
     assert sp_team_ratings[2]["raw_value"] == pytest.approx(10.0)   # Indiana
     assert sp_team_ratings[1]["season"] == YEAR
     assert sp_team_ratings[1]["week"] == WEEK  # pinned to this week, not just "latest"
+    assert sp_team_ratings[1]["season_type"] == "regular"
 
 
 def test_ap_poll_captured_but_not_other_polls(fake_conn, mocked_cfbd):
@@ -305,6 +307,7 @@ def test_ap_poll_captured_but_not_other_polls(fake_conn, mocked_cfbd):
     assert by_team[1]["poll"] == "AP Top 25"
     assert by_team[1]["poll_rank"] == 2   # AP rank, not the Coaches Poll's rank 1
     assert by_team[1]["week"] == WEEK
+    assert by_team[1]["season_type"] == "regular"
     assert by_team[2]["poll_rank"] == 15  # Indiana
 
 
@@ -347,3 +350,103 @@ def test_each_source_commits_independently_of_a_later_failure(fake_conn, mocked_
     collect.run(YEAR, WEEK, "regular")
     assert fake_conn.commits >= 5  # teams + games + 4 successful model sources + lines
     assert fake_conn.rollbacks == 1  # only srs's failed transaction rolls back
+
+
+# --- postseason: season_type must be stored, never assumed "regular" -----
+
+def test_team_ratings_tagged_with_postseason_when_collected_there(fake_conn):
+    # Without this tag, a postseason week 1 collection would land on the
+    # exact same (season, week) key as the real regular-season week 1
+    # snapshot and silently become its "latest" row.
+    collect.collect_team_ratings(fake_conn, MODEL_SOURCES[0], _sp_ratings(), YEAR, WEEK,
+                                  season_type="postseason")
+    assert fake_conn.team_ratings_inserted
+    assert all(r["season_type"] == "postseason" for r in fake_conn.team_ratings_inserted)
+
+
+def test_poll_rankings_tagged_with_postseason_when_collected_there(fake_conn, monkeypatch):
+    postseason_rankings = [
+        {"season": YEAR, "seasonType": "postseason", "week": WEEK, "polls": [
+            {"poll": "AP Top 25", "ranks": [
+                {"rank": 1, "school": "Ohio State", "points": 1600, "firstPlaceVotes": 30},
+            ]},
+        ]},
+    ]
+    monkeypatch.setattr(cfbd_client, "get_rankings", lambda **kw: postseason_rankings)
+
+    collect.collect_poll_rankings(fake_conn, YEAR, WEEK, season_type="postseason")
+    assert fake_conn.poll_rankings_inserted
+    assert all(r["season_type"] == "postseason" for r in fake_conn.poll_rankings_inserted)
+
+
+def test_poll_rankings_skips_entries_whose_season_type_does_not_match(fake_conn, monkeypatch):
+    # _rankings() always tags its entry "regular" -- requesting "postseason"
+    # against that same data must yield nothing rather than misfiling a
+    # regular-season poll as postseason.
+    monkeypatch.setattr(cfbd_client, "get_rankings", lambda **kw: _rankings())
+    collect.collect_poll_rankings(fake_conn, YEAR, WEEK, season_type="postseason")
+    assert fake_conn.poll_rankings_inserted == []
+
+
+# --- determine_current_week: chronological across regular + postseason --
+
+def _iso_z(d: dt.datetime) -> str:
+    return d.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+
+
+def test_determine_current_week_picks_postseason_once_regular_season_ends(monkeypatch):
+    now = dt.datetime.now(dt.timezone.utc)
+    calendar = [
+        {"season": YEAR, "week": 1, "seasonType": "regular",
+         "startDate": _iso_z(now - dt.timedelta(days=60)),
+         "endDate": _iso_z(now - dt.timedelta(days=53))},
+        {"season": YEAR, "week": 15, "seasonType": "regular",
+         "startDate": _iso_z(now - dt.timedelta(days=14)),
+         "endDate": _iso_z(now - dt.timedelta(days=7))},
+        {"season": YEAR, "week": 1, "seasonType": "postseason",
+         "startDate": _iso_z(now - dt.timedelta(days=1)),
+         "endDate": _iso_z(now + dt.timedelta(days=6))},
+    ]
+    monkeypatch.setattr(cfbd_client, "get_calendar", lambda year: calendar)
+
+    week, season_type = collect.determine_current_week(YEAR)
+    assert (week, season_type) == (1, "postseason")
+
+
+def test_determine_current_week_stays_on_last_postseason_week_after_season_ends(monkeypatch):
+    # The regression this guards against: before this fix, once "now" was
+    # past every regular-season week, determine_current_week got stuck
+    # re-declaring the final regular week forever -- even once the season
+    # had actually moved into, and finished, the postseason.
+    now = dt.datetime.now(dt.timezone.utc)
+    calendar = [
+        {"season": YEAR, "week": 15, "seasonType": "regular",
+         "startDate": _iso_z(now - dt.timedelta(days=60)),
+         "endDate": _iso_z(now - dt.timedelta(days=53))},
+        {"season": YEAR, "week": 1, "seasonType": "postseason",
+         "startDate": _iso_z(now - dt.timedelta(days=20)),
+         "endDate": _iso_z(now - dt.timedelta(days=13))},
+        {"season": YEAR, "week": 2, "seasonType": "postseason",
+         "startDate": _iso_z(now - dt.timedelta(days=12)),
+         "endDate": _iso_z(now - dt.timedelta(days=5))},
+    ]
+    monkeypatch.setattr(cfbd_client, "get_calendar", lambda year: calendar)
+
+    week, season_type = collect.determine_current_week(YEAR)
+    assert (week, season_type) == (2, "postseason")
+
+
+def test_determine_current_week_before_season_starts_picks_first_regular_week(monkeypatch):
+    now = dt.datetime.now(dt.timezone.utc)
+    calendar = [
+        {"season": YEAR, "week": 1, "seasonType": "regular",
+         "startDate": _iso_z(now + dt.timedelta(days=5)),
+         "endDate": _iso_z(now + dt.timedelta(days=12))},
+        {"season": YEAR, "week": 2, "seasonType": "regular",
+         "startDate": _iso_z(now + dt.timedelta(days=12)),
+         "endDate": _iso_z(now + dt.timedelta(days=19))},
+    ]
+    monkeypatch.setattr(cfbd_client, "get_calendar", lambda year: calendar)
+
+    week, season_type = collect.determine_current_week(YEAR)
+    assert (week, season_type) == (1, "regular")

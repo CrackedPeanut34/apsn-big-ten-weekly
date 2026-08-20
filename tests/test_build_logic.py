@@ -5,6 +5,25 @@ import pytest
 import build
 
 
+def test_week_filename_regular_has_no_prefix():
+    assert build.week_filename(1, "regular") == "week-01.html"
+
+
+def test_week_filename_postseason_gets_a_distinct_name():
+    # Postseason week numbers restart from 1, same as the regular season --
+    # these must never collide on disk.
+    assert build.week_filename(1, "postseason") == "postseason-week-01.html"
+    assert build.week_filename(1, "regular") != build.week_filename(1, "postseason")
+
+
+def test_rankings_filename_regular_has_no_prefix():
+    assert build.rankings_filename(3, "regular") == "rankings-week-03.html"
+
+
+def test_rankings_filename_postseason_gets_a_distinct_name():
+    assert build.rankings_filename(1, "postseason") == "postseason-rankings-week-01.html"
+
+
 def test_market_avg_margin_averages_across_providers():
     odds = [{"margin_home": 10.0}, {"margin_home": 6.0}]
     assert build.market_avg_margin(odds) == pytest.approx(8.0)

@@ -89,6 +89,15 @@ def get_srs(year: int, conference: str | None = None) -> list[dict]:
 
 def get_elo(year: int, week: int | None = None,
             conference: str | None = None) -> list[dict]:
+    # No seasonType param -- unlike get_games/get_lines/get_pregame_wp/
+    # get_rankings above, this endpoint's parameters weren't confirmed
+    # against the live OpenAPI spec (too large to fetch in full) and Elo is
+    # a running/cumulative rating rather than recalculated fresh each week
+    # (see model_sources seed data), so its postseason `week` semantics are
+    # genuinely unverified. Re-check against real data once a postseason
+    # week is actually being collected -- same spirit as
+    # test_spread_sign_convention.py confirming a live-data assumption
+    # rather than assuming it.
     params = {"year": year}
     if week:
         params["week"] = week

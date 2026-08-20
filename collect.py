@@ -31,26 +31,33 @@ def log(msg: str) -> None:
 
 
 def determine_current_week(year: int) -> tuple[int, str]:
+    """Picks the current (week, season_type) chronologically across both
+    regular-season and postseason calendar weeks -- postseason week numbers
+    restart from 1, so week number alone can't order them against the
+    regular season. Once the whole season (postseason included) has
+    finished, this correctly keeps returning the last postseason week
+    instead of getting stuck re-declaring the final regular-season week
+    forever."""
     calendar = cfbd_client.get_calendar(year)
     now = dt.datetime.now(dt.timezone.utc)
-
-    regular = sorted(
-        (w for w in calendar if w.get("seasonType") == "regular"),
-        key=lambda w: w["week"],
-    )
-    if not regular:
-        raise RuntimeError(f"no regular-season weeks in CFBD calendar for {year}")
 
     def parse(ts: str) -> dt.datetime:
         return dt.datetime.fromisoformat(ts.replace("Z", "+00:00"))
 
-    for w in regular:
-        if parse(w["startDate"]) <= now < parse(w["endDate"]):
-            return w["week"], "regular"
+    weeks = sorted(
+        (w for w in calendar if w.get("seasonType") in ("regular", "postseason")),
+        key=lambda w: parse(w["startDate"]),
+    )
+    if not weeks:
+        raise RuntimeError(f"no regular-season or postseason weeks in CFBD calendar for {year}")
 
-    if now < parse(regular[0]["startDate"]):
-        return regular[0]["week"], "regular"
-    return regular[-1]["week"], "regular"
+    for w in weeks:
+        if parse(w["startDate"]) <= now < parse(w["endDate"]):
+            return w["week"], w["seasonType"]
+
+    if now < parse(weeks[0]["startDate"]):
+        return weeks[0]["week"], weeks[0]["seasonType"]
+    return weeks[-1]["week"], weeks[-1]["seasonType"]
 
 
 def refresh_teams_if_stale(conn, year: int) -> None:
@@ -212,12 +219,15 @@ def collect_power_rating_source(conn, source: dict, games: list[dict], ratings: 
 
 
 def collect_team_ratings(conn, source: dict, ratings: list[dict], season: int, week: int,
-                          team_key: str = "team", rating_key: str = "rating") -> int:
+                          season_type: str = "regular", team_key: str = "team",
+                          rating_key: str = "rating") -> int:
     """Every team a source rates, independent of who they're playing this
     week -- see 0003_team_ratings.sql for why collect_power_rating_source's
     per-game rows aren't enough on their own. Tagged with the collection
-    week (0004_week_scoped_rankings.sql) so this week's rankings snapshot
-    is pinned and never redrawn once a later week has its own rows."""
+    week and season_type (0004_week_scoped_rankings.sql, 0005_season_type_
+    scoped_ratings.sql) so this week's rankings snapshot is pinned and
+    never redrawn once a later week has its own rows -- including a
+    postseason week reusing the same week number as a regular-season one."""
     with conn.cursor() as cur:
         cur.execute("SELECT id, school FROM teams")
         team_id_by_school = {row["school"]: row["id"] for row in cur.fetchall()}
@@ -229,16 +239,17 @@ def collect_team_ratings(conn, source: dict, ratings: list[dict], season: int, w
                 continue  # team not upserted yet -- refresh_teams_if_stale will catch it next run
             cur.execute(
                 """
-                INSERT INTO team_ratings (team_id, model_source_id, season, week, collected_at,
-                                           raw_value, raw_payload, conversion_version)
-                VALUES (%(team_id)s, %(model_source_id)s, %(season)s, %(week)s, now(),
-                        %(raw_value)s, %(raw_payload)s, %(conversion_version)s)
+                INSERT INTO team_ratings (team_id, model_source_id, season, week, season_type,
+                                           collected_at, raw_value, raw_payload, conversion_version)
+                VALUES (%(team_id)s, %(model_source_id)s, %(season)s, %(week)s, %(season_type)s,
+                        now(), %(raw_value)s, %(raw_payload)s, %(conversion_version)s)
                 """,
                 {
                     "team_id": team_id,
                     "model_source_id": source["id"],
                     "season": season,
                     "week": week,
+                    "season_type": season_type,
                     "raw_value": r[rating_key],
                     "raw_payload": json.dumps(r),
                     "conversion_version": c.CONVERSION_VERSION,
@@ -255,7 +266,10 @@ AP_POLL_NAME = "AP Top 25"
 def collect_poll_rankings(conn, year: int, week: int, season_type: str = "regular") -> int:
     """AP Top 25 only, out of the handful of polls CFBD returns (Coaches,
     FCS/D-II/D-III polls too) -- that's the one that was asked for. Same
-    week-pinning as team_ratings: append-only, tagged with this week."""
+    week-pinning as team_ratings: append-only, tagged with this week and
+    season_type (0005_season_type_scoped_ratings.sql) so a postseason
+    week never lands on the same pinned snapshot as a regular-season week
+    that happens to share its week number."""
     entries = cfbd_client.get_rankings(year=year, week=week, season_type=season_type)
     with conn.cursor() as cur:
         cur.execute("SELECT id, school FROM teams")
@@ -263,7 +277,7 @@ def collect_poll_rankings(conn, year: int, week: int, season_type: str = "regula
 
         rows = 0
         for entry in entries:
-            if entry.get("week") != week:
+            if entry.get("week") != week or entry.get("seasonType") != season_type:
                 continue
             for poll in entry.get("polls", []):
                 if poll["poll"] != AP_POLL_NAME:
@@ -274,15 +288,16 @@ def collect_poll_rankings(conn, year: int, week: int, season_type: str = "regula
                         continue
                     cur.execute(
                         """
-                        INSERT INTO poll_rankings (team_id, season, week, poll, poll_rank,
-                                                    points, first_place_votes, collected_at)
-                        VALUES (%(team_id)s, %(season)s, %(week)s, %(poll)s, %(poll_rank)s,
-                                %(points)s, %(first_place_votes)s, now())
+                        INSERT INTO poll_rankings (team_id, season, week, season_type, poll,
+                                                    poll_rank, points, first_place_votes, collected_at)
+                        VALUES (%(team_id)s, %(season)s, %(week)s, %(season_type)s, %(poll)s,
+                                %(poll_rank)s, %(points)s, %(first_place_votes)s, now())
                         """,
                         {
                             "team_id": team_id,
                             "season": year,
                             "week": week,
+                            "season_type": season_type,
                             "poll": poll["poll"],
                             "poll_rank": r["rank"],
                             "points": r.get("points"),
@@ -418,22 +433,22 @@ def run(year: int, week: int, season_type: str = "regular") -> int:
             if source["slug"] == "sp-plus":
                 ratings = cfbd_client.get_sp(year=year)
                 rows = collect_power_rating_source(conn, source, games, ratings)
-                rows += collect_team_ratings(conn, source, ratings, year, week)
+                rows += collect_team_ratings(conn, source, ratings, year, week, season_type=season_type)
             elif source["slug"] == "srs":
                 # Not conference-filtered: nonconference opponents need a
                 # rating too, or the home-minus-away differential can never
                 # be computed (see the same fix on teams/games above).
                 ratings = cfbd_client.get_srs(year=year)
                 rows = collect_power_rating_source(conn, source, games, ratings)
-                rows += collect_team_ratings(conn, source, ratings, year, week)
+                rows += collect_team_ratings(conn, source, ratings, year, week, season_type=season_type)
             elif source["slug"] == "elo":
                 ratings = cfbd_client.get_elo(year=year, week=week)
                 rows = collect_power_rating_source(conn, source, games, ratings, rating_key="elo")
-                rows += collect_team_ratings(conn, source, ratings, year, week, rating_key="elo")
+                rows += collect_team_ratings(conn, source, ratings, year, week, season_type=season_type, rating_key="elo")
             elif source["slug"] == "fpi":
                 ratings = cfbd_client.get_fpi(year=year)
                 rows = collect_power_rating_source(conn, source, games, ratings, rating_key="fpi")
-                rows += collect_team_ratings(conn, source, ratings, year, week, rating_key="fpi")
+                rows += collect_team_ratings(conn, source, ratings, year, week, season_type=season_type, rating_key="fpi")
             elif source["slug"] == "cfbd-pregame-wp":
                 wp_rows = cfbd_client.get_pregame_wp(year=year, week=week, season_type=season_type)
                 rows = collect_pregame_wp_source(conn, source, games, wp_rows)
