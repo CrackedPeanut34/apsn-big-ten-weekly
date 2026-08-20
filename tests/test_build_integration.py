@@ -125,9 +125,14 @@ class FakeCursor:
         elif "FROM poll_rankings pr" in n:
             self._result = ("all", AP_RANKINGS)
         elif "GROUP BY t.id" in n:
-            # GAME_ROW is unplayed (points still None) -> both teams 0-0.
-            self._result = ("all", [{"team_id": 1, "wins": 0, "losses": 0},
-                                     {"team_id": 2, "wins": 0, "losses": 0}])
+            # Ohio State's overall record (3-0) is padded by nonconference
+            # wins and is actually worse in Big Ten play (1-2) than
+            # Indiana's (1-2 overall, 2-1 in Big Ten play) -- lets tests
+            # tell "sorted by Big Ten record" apart from "sorted overall".
+            self._result = ("all", [
+                {"team_id": 1, "wins": 3, "losses": 0, "conf_wins": 1, "conf_losses": 2},
+                {"team_id": 2, "wins": 1, "losses": 2, "conf_wins": 2, "conf_losses": 1},
+            ])
         else:
             raise AssertionError(f"unexpected SQL: {n[:100]}")
 
@@ -310,12 +315,31 @@ def test_rankings_page_sorted_by_fpi_not_alphabetically(wired, monkeypatch):
 
 
 def test_rankings_page_shows_win_loss_record(wired, monkeypatch):
-    # GAME_ROW hasn't been played (points still None) -> both teams 0-0.
+    # Overall record shown first, Big Ten-only record in parentheses.
     monkeypatch.setattr("sys.argv", ["build.py"])
     build.main()
     html = (wired / "site" / str(SEASON) / RANKINGS_FILENAME).read_text()
     assert "Record" in html
-    assert "0-0" in html
+    assert "3-0 (1-2)" in html  # Ohio State
+    assert "1-2 (2-1)" in html  # Indiana
+
+
+def test_record_column_sorts_by_big_ten_record_not_overall(wired, monkeypatch):
+    # Ohio State's overall record (3-0, 100%) beats Indiana's (1-2, 33%),
+    # but Indiana's Big Ten-only record (2-1, 67%) beats Ohio State's
+    # (1-2, 33%) -- the Record column's sort value must follow the Big
+    # Ten record, not the gaudier overall one.
+    monkeypatch.setattr("sys.argv", ["build.py"])
+    build.main()
+    html = (wired / "site" / str(SEASON) / RANKINGS_FILENAME).read_text()
+
+    def record_sort_value(school):
+        cell_idx = html.index('data-sort-cell="record"', html.index(school))
+        start = html.index('data-value="', cell_idx) + len('data-value="')
+        end = html.index('"', start)
+        return float(html[start:end])
+
+    assert record_sort_value("Ohio State") < record_sort_value("Indiana")
 
 
 def test_rankings_page_shows_national_rank_and_ap_badge(wired, monkeypatch):

@@ -235,11 +235,13 @@ def fetch_latest_odds(conn, game_ids: list[int]) -> dict[int, list[dict]]:
     return result
 
 
-def fetch_team_records(conn, season: int) -> dict[int, tuple[int, int]]:
-    """Wins/losses per Big Ten team, straight from games already collected --
-    no new data source. Counts every played game (home_points/away_points
-    both set), conference or not, so it updates on its own as collect.py
-    picks up new results week over week; nothing to maintain by hand."""
+def fetch_team_records(conn, season: int) -> dict[int, tuple[int, int, int, int]]:
+    """(wins, losses, conf_wins, conf_losses) per Big Ten team, straight from
+    games already collected -- no new data source. wins/losses count every
+    played game (home_points/away_points both set) regardless of opponent;
+    conf_wins/conf_losses additionally require the opponent to be a Big Ten
+    team too. Updates on its own as collect.py picks up new results week
+    over week; nothing to maintain by hand."""
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -252,18 +254,33 @@ def fetch_team_records(conn, season: int) -> dict[int, tuple[int, int]]:
                 COUNT(*) FILTER (
                     WHERE (g.home_team_id = t.id AND g.home_points < g.away_points)
                        OR (g.away_team_id = t.id AND g.away_points < g.home_points)
-                ) AS losses
+                ) AS losses,
+                COUNT(*) FILTER (
+                    WHERE ht.conference = 'Big Ten' AND at.conference = 'Big Ten'
+                      AND ((g.home_team_id = t.id AND g.home_points > g.away_points)
+                           OR (g.away_team_id = t.id AND g.away_points > g.home_points))
+                ) AS conf_wins,
+                COUNT(*) FILTER (
+                    WHERE ht.conference = 'Big Ten' AND at.conference = 'Big Ten'
+                      AND ((g.home_team_id = t.id AND g.home_points < g.away_points)
+                           OR (g.away_team_id = t.id AND g.away_points < g.home_points))
+                ) AS conf_losses
             FROM teams t
             LEFT JOIN games g
                 ON (g.home_team_id = t.id OR g.away_team_id = t.id)
                 AND g.season = %(season)s
                 AND g.home_points IS NOT NULL AND g.away_points IS NOT NULL
+            LEFT JOIN teams ht ON ht.id = g.home_team_id
+            LEFT JOIN teams at ON at.id = g.away_team_id
             WHERE t.conference = 'Big Ten'
             GROUP BY t.id
             """,
             {"season": season},
         )
-        return {row["team_id"]: (row["wins"], row["losses"]) for row in cur.fetchall()}
+        return {
+            row["team_id"]: (row["wins"], row["losses"], row["conf_wins"], row["conf_losses"])
+            for row in cur.fetchall()
+        }
 
 
 def compute_national_ranks(latest: list[dict]) -> dict[tuple[int, int], int]:
@@ -351,7 +368,7 @@ def fetch_team_ratings(conn, season: int, week: int, season_type: str) -> tuple[
     by_team_and_source = {(r["team_id"], r["model_source_id"]): r for r in latest}
     rows = []
     for team in big_ten_teams:
-        wins, losses = records.get(team["id"], (0, 0))
+        wins, losses, conf_wins, conf_losses = records.get(team["id"], (0, 0, 0, 0))
         cells = []
         for source in sources:
             r = by_team_and_source.get((team["id"], source["id"]))
@@ -363,11 +380,15 @@ def fetch_team_ratings(conn, season: int, week: int, season_type: str) -> tuple[
                 "display": fmt.format(value) if value is not None else "—",
                 "national_rank": national_rank.get((team["id"], source["id"])),
             })
+        conf_games = conf_wins + conf_losses
         rows.append({
             "school": team["school"],
             "logo_url": team["logo_url"],
-            "record_display": f"{wins}-{losses}",
-            "record_value": wins / (wins + losses) if (wins + losses) > 0 else None,
+            # Big Ten record in parentheses; ranked (sort value) by Big Ten
+            # win percentage specifically, not the overall record -- a
+            # gaudy nonconference schedule shouldn't outrank actual B1G play.
+            "record_display": f"{wins}-{losses} ({conf_wins}-{conf_losses})",
+            "record_value": conf_wins / conf_games if conf_games > 0 else None,
             "ap_rank": ap_rank_by_team.get(team["id"]),
             "cells": cells,
         })
