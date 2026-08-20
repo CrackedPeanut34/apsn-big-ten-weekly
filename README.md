@@ -82,7 +82,7 @@ this. Everything here ran and passed locally; nothing was hand-waved.
 2. Add repo secrets: Settings → Secrets and variables → Actions →
    `CFBD_API_KEY`, `DATABASE_URL`.
 3. Enable Pages: Settings → Pages → Source: **GitHub Actions**.
-4. `.github/workflows/deploy.yml` runs on a schedule (Tue/Thu/Sat mornings,
+4. `.github/workflows/deploy.yml` runs on a schedule (Tue/Sat mornings,
    12:00 UTC -- see the file for why cadence matters here: line movement
    between snapshots is the one part of the record that can't be
    backfilled) and on every push to `main`, so editing a summary or the CSS

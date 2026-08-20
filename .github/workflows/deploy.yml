@@ -2,10 +2,10 @@ name: Collect, build, and deploy
 
 on:
   schedule:
-    # Tue/Thu/Sat mornings, 12:00 UTC (8am ET / 7am during standard time).
+    # Tue/Sat mornings, 12:00 UTC (8am ET / 7am during standard time).
     # GitHub Actions cron is fixed UTC and doesn't shift for DST -- v1 accepts
     # the hour drifting by one across the fall/spring changeover.
-    - cron: '0 12 * * 2,4,6'
+    - cron: '0 12 * * 2,6'
   push:
     branches: [main]
   workflow_dispatch:
