@@ -152,17 +152,36 @@ a:hover {
 }
 
 .week-switcher {
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* The week list grows every week all season -- it's the part that
+   scrolls. Rankings/Charts live outside this container (see
+   .week-switcher-pinned below) so they stay reachable without scrolling
+   past however many weeks have accumulated. */
+.week-list-scroll {
   overflow-x: auto;
   flex: 1 1 auto;
   min-width: 0;
 }
 
-.week-switcher ul {
+.week-switcher ul,
+.week-list {
   list-style: none;
   display: flex;
   gap: 0.25rem;
   margin: 0;
   padding: 0;
+}
+
+.week-switcher-pinned {
+  flex: none;
+  border-left: 1px solid var(--border);
+  margin-left: 0.5rem;
+  padding-left: 0.5rem;
 }
 
 .week-switcher a {
