@@ -353,7 +353,7 @@ def fetch_team_ratings(conn, season: int, week: int, season_type: str) -> tuple[
         sources = cur.fetchall()
 
         cur.execute(
-            "SELECT id, school, logo_url, color FROM teams WHERE conference = 'Big Ten' ORDER BY school"
+            "SELECT id, school, abbreviation, logo_url, color FROM teams WHERE conference = 'Big Ten' ORDER BY school"
         )
         big_ten_teams = cur.fetchall()
 
@@ -394,6 +394,7 @@ def fetch_team_ratings(conn, season: int, week: int, season_type: str) -> tuple[
         conf_games = conf_wins + conf_losses
         rows.append({
             "school": team["school"],
+            "abbreviation": team["abbreviation"],
             "logo_url": team["logo_url"],
             "color": team["color"],
             # Big Ten record in parentheses; ranked (sort value) by Big Ten
@@ -432,6 +433,7 @@ def build_chart_export(season: int, week: int, season_type: str,
             values[cell["slug"].replace("-", "_")] = cell["value"]
         team_rows.append({
             "school": team["school"],
+            "abbr": team["abbreviation"] or team["school"],
             "logo_url": team["logo_url"],
             "color": team["color"],
             "values": values,

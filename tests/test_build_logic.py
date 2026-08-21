@@ -47,12 +47,12 @@ CHART_SOURCES = [
 
 CHART_TEAMS = [
     {
-        "school": "Ohio State", "logo_url": "https://a/light.png", "color": "#BB0000",
+        "school": "Ohio State", "abbreviation": "OSU", "logo_url": "https://a/light.png", "color": "#BB0000",
         "ap_rank": 3,
         "cells": [{"slug": "sp-plus", "value": 25.0}, {"slug": "elo", "value": 2100.0}],
     },
     {
-        "school": "Indiana", "logo_url": "https://b/light.png", "color": "#990000",
+        "school": "Indiana", "abbreviation": None, "logo_url": "https://b/light.png", "color": "#990000",
         "ap_rank": None,
         "cells": [{"slug": "sp-plus", "value": None}, {"slug": "elo", "value": 1800.0}],
     },
@@ -97,6 +97,18 @@ def test_build_chart_export_missing_value_is_null_not_dropped():
     assert indiana["values"]["sp_plus"] is None
     assert indiana["values"]["ap_rank"] is None
     assert indiana["values"]["elo"] == 1800.0
+
+
+def test_build_chart_export_includes_team_abbreviation_for_scatter_labels():
+    export = build.build_chart_export(2026, 1, "regular", CHART_TEAMS, CHART_SOURCES)
+    ohio_state = next(t for t in export["teams"] if t["school"] == "Ohio State")
+    assert ohio_state["abbr"] == "OSU"
+
+
+def test_build_chart_export_falls_back_to_school_name_when_abbreviation_missing():
+    export = build.build_chart_export(2026, 1, "regular", CHART_TEAMS, CHART_SOURCES)
+    indiana = next(t for t in export["teams"] if t["school"] == "Indiana")
+    assert indiana["abbr"] == "Indiana"
 
 
 def test_market_avg_margin_averages_across_providers():

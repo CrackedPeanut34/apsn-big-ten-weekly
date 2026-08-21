@@ -1,19 +1,52 @@
 {% extends "base.html" %}
 
-{% block title %}Rankings Chart, Week {{ week }} &mdash; APSN Big Ten Weekly{% endblock %}
+{% block title %}Rankings Dashboard, Week {{ week }} &mdash; APSN Big Ten Weekly{% endblock %}
 
 {% block week_switcher %}{% include "_nav.html" %}{% endblock %}
 
 {% block content %}
 <div class="week-page">
   <div class="week-heading">
-    <h1>Rankings Chart</h1>
+    <h1>Rankings Dashboard</h1>
   </div>
 
-  <div class="chart-card">
+  <div class="dashboard-tabs" role="tablist" aria-label="Rankings dashboard view">
+    <button type="button" class="dashboard-tab is-active" id="tab-btn-rankings"
+            role="tab" aria-selected="true" aria-controls="tab-panel-rankings">
+      Rankings
+    </button>
+    <button type="button" class="dashboard-tab" id="tab-btn-compare"
+            role="tab" aria-selected="false" aria-controls="tab-panel-compare">
+      Compare
+    </button>
+  </div>
+
+  <div class="chart-card" id="tab-panel-rankings" role="tabpanel" aria-labelledby="tab-btn-rankings">
     <div class="chart-controls" id="chart-controls" role="group" aria-label="Sort by"></div>
     <div class="chart-canvas-wrap">
       <canvas id="rankings-chart" role="img" aria-label="Big Ten teams ranked by the selected stat"></canvas>
+    </div>
+  </div>
+
+  <div class="chart-card" id="tab-panel-compare" role="tabpanel" aria-labelledby="tab-btn-compare" hidden>
+    <div class="compare-controls">
+      <label class="compare-field">
+        <span>X axis</span>
+        <select id="compare-x-select"></select>
+      </label>
+      <label class="compare-field">
+        <span>Y axis</span>
+        <select id="compare-y-select"></select>
+      </label>
+      <div class="compare-marker-toggle" role="group" aria-label="Marker style">
+        <button type="button" class="marker-mode-btn is-active" data-marker-mode="logo">Logos</button>
+        <button type="button" class="marker-mode-btn" data-marker-mode="color">Color + label</button>
+      </div>
+    </div>
+    <p id="compare-loading" class="compare-loading">Loading comparison data&hellip;</p>
+    <div id="compare-scatter-outer" class="compare-scatter-wrap" hidden>
+      <div id="compare-scatter"></div>
+      <div id="compare-logo-layer" class="compare-logo-layer" aria-hidden="true"></div>
     </div>
   </div>
 </div>
@@ -21,6 +54,9 @@
 
 {% block extra_scripts %}
 <script src="{{ asset_prefix }}assets/js/vendor/chart.umd.min.js"></script>
+<script src="{{ asset_prefix }}assets/js/vendor/plotly-basic.min.js"></script>
 <script>window.APSN_CHART_DATA_URL = "{{ chart_data_path }}";</script>
 <script src="{{ asset_prefix }}assets/js/rankings-chart.js" defer></script>
+<script src="{{ asset_prefix }}assets/js/rankings-compare.js" defer></script>
+<script src="{{ asset_prefix }}assets/js/dashboard-tabs.js" defer></script>
 {% endblock %}

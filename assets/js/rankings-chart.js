@@ -141,6 +141,11 @@
       var stat = stats.filter(function (s) { return s.key === key; })[0];
       var rows = rowsForStat(stat);
 
+      // Only cross-component surface: the Compare tab reads this once, the
+      // first time it's opened, to default its X axis to whatever the bar
+      // chart was sorted by (see dashboard-tabs.js / rankings-compare.js).
+      window.APSN_ACTIVE_BAR_STAT = key;
+
       chart.$activeStat = stat;
       chart.$rows = rows;
       chart.data.labels = rows.map(function (r) { return r.school; });

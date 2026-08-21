@@ -61,8 +61,8 @@ ODDS = [
 ]
 
 TEAMS = [
-    {"id": 1, "school": "Ohio State", "logo_url": "https://a/light.png", "color": "#BB0000"},
-    {"id": 2, "school": "Indiana", "logo_url": "https://b/light.png", "color": "#990000"},
+    {"id": 1, "school": "Ohio State", "abbreviation": "OSU", "logo_url": "https://a/light.png", "color": "#BB0000"},
+    {"id": 2, "school": "Indiana", "abbreviation": "IU", "logo_url": "https://b/light.png", "color": "#990000"},
 ]
 
 # Only SP+ and FPI have team_ratings rows -- SRS must render as em dash on
@@ -118,7 +118,7 @@ class FakeCursor:
             self._result = ("all", ODDS)
         elif "max(t) AS latest" in n:
             self._result = ("one", {"latest": ODDS[0]["collected_at"]})
-        elif n.startswith("SELECT id, school, logo_url, color FROM teams"):
+        elif n.startswith("SELECT id, school, abbreviation, logo_url, color FROM teams"):
             self._result = ("all", TEAMS)
         elif "FROM team_ratings tr" in n:
             self._result = ("all", TEAM_RATINGS)
@@ -402,6 +402,25 @@ def test_chart_page_loads_chart_js_and_the_weeks_json_file(wired, monkeypatch):
     assert "assets/js/vendor/chart.umd.min.js" in html
     assert "assets/js/rankings-chart.js" in html
     assert CHART_DATA_FILENAME in html
+
+
+def test_chart_page_has_rankings_and_compare_tabs(wired, monkeypatch):
+    # Same page now hosts both the (untouched) bar chart and the new
+    # scatter -- both tab panels and both components' scripts must be
+    # present, and Plotly loads alongside Chart.js rather than replacing it
+    # (see the "keep the bar chart, add Plotly only for Compare" decision).
+    monkeypatch.setattr("sys.argv", ["build.py"])
+    build.main()
+    html = (wired / "site" / str(SEASON) / CHART_PAGE_FILENAME).read_text()
+    assert 'id="tab-btn-rankings"' in html
+    assert 'id="tab-btn-compare"' in html
+    assert 'id="tab-panel-rankings"' in html
+    assert 'id="tab-panel-compare"' in html
+    assert "assets/js/vendor/chart.umd.min.js" in html
+    assert "assets/js/vendor/plotly-basic.min.js" in html
+    assert "assets/js/rankings-chart.js" in html
+    assert "assets/js/rankings-compare.js" in html
+    assert "assets/js/dashboard-tabs.js" in html
 
 
 def test_chart_nav_link_appears_on_week_and_rankings_pages(wired, monkeypatch):

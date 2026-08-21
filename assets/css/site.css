@@ -867,6 +867,138 @@ main {
   height: 620px;
 }
 
+/* ---------- rankings dashboard tabs + compare (scatter) ---------- */
+
+.dashboard-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.dashboard-tab {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--text-dim);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.55rem 1.1rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.dashboard-tab:hover {
+  color: var(--text);
+  border-color: var(--text-faint);
+}
+
+.dashboard-tab.is-active {
+  background: var(--red);
+  border-color: var(--red);
+  color: #fff;
+}
+
+.compare-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 1.25rem;
+  margin-bottom: 1.25rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.compare-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-faint);
+}
+
+.compare-field select {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.45rem 0.6rem;
+  cursor: pointer;
+}
+
+.compare-marker-toggle {
+  display: flex;
+  gap: 0.4rem;
+  margin-left: auto;
+}
+
+.marker-mode-btn {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.4rem 0.9rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.marker-mode-btn:hover {
+  border-color: var(--text-faint);
+  color: var(--text);
+}
+
+.marker-mode-btn.is-active {
+  background: var(--red);
+  border-color: var(--red);
+  color: #fff;
+}
+
+.compare-loading {
+  color: var(--text-faint);
+  font-size: 0.9rem;
+  padding: 2rem 0;
+  text-align: center;
+}
+
+.compare-scatter-wrap {
+  position: relative;
+  width: 100%;
+  height: 560px;
+}
+
+#compare-scatter {
+  position: absolute;
+  inset: 0;
+}
+
+/* Logo-mode markers are real <img> elements overlaid on top of the Plotly
+   SVG, not Plotly's own layout.images -- CFBD's logo CDN doesn't send
+   CORS headers, which Plotly's image loader requires but a plain <img>
+   never does. Purely decorative: the underlying (invisible) Plotly
+   markers still handle hover/tooltip hit-testing. */
+.compare-logo-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.compare-logo-layer img {
+  position: absolute;
+  object-fit: contain;
+}
+
 /* ---------- footer ---------- */
 
 .site-footer {
