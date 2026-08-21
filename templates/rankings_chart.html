@@ -1,34 +1,38 @@
 {% extends "base.html" %}
 
-{% block title %}Rankings Dashboard, Week {{ week }} &mdash; APSN Big Ten Weekly{% endblock %}
+{% block title %}Graphs, Week {{ week }} &mdash; APSN Big Ten Weekly{% endblock %}
 
 {% block week_switcher %}{% include "_nav.html" %}{% endblock %}
 
 {% block content %}
 <div class="week-page">
   <div class="week-heading">
-    <h1>Rankings Dashboard</h1>
+    <h1>Graphs</h1>
   </div>
 
-  <div class="dashboard-tabs" role="tablist" aria-label="Rankings dashboard view">
-    <button type="button" class="dashboard-tab is-active" id="tab-btn-rankings"
-            role="tab" aria-selected="true" aria-controls="tab-panel-rankings">
-      Rankings
+  <div class="dashboard-tabs" role="tablist" aria-label="Graphs view">
+    <button type="button" class="dashboard-tab is-active" id="tab-btn-bar"
+            role="tab" aria-selected="true" aria-controls="tab-panel-bar">
+      Bar
     </button>
-    <button type="button" class="dashboard-tab" id="tab-btn-compare"
-            role="tab" aria-selected="false" aria-controls="tab-panel-compare">
-      Compare
+    <button type="button" class="dashboard-tab" id="tab-btn-scatter"
+            role="tab" aria-selected="false" aria-controls="tab-panel-scatter">
+      Scatter Plot
+    </button>
+    <button type="button" class="dashboard-tab" id="tab-btn-h2h"
+            role="tab" aria-selected="false" aria-controls="tab-panel-h2h">
+      Head to Head
     </button>
   </div>
 
-  <div class="chart-card" id="tab-panel-rankings" role="tabpanel" aria-labelledby="tab-btn-rankings">
+  <div class="chart-card" id="tab-panel-bar" role="tabpanel" aria-labelledby="tab-btn-bar">
     <div class="chart-controls" id="chart-controls" role="group" aria-label="Sort by"></div>
     <div class="chart-canvas-wrap">
       <canvas id="rankings-chart" role="img" aria-label="Big Ten teams ranked by the selected stat"></canvas>
     </div>
   </div>
 
-  <div class="chart-card" id="tab-panel-compare" role="tabpanel" aria-labelledby="tab-btn-compare" hidden>
+  <div class="chart-card" id="tab-panel-scatter" role="tabpanel" aria-labelledby="tab-btn-scatter" hidden>
     <div class="compare-controls">
       <label class="compare-field">
         <span>X axis</span>
@@ -49,6 +53,21 @@
       <div id="compare-logo-layer" class="compare-logo-layer" aria-hidden="true"></div>
     </div>
   </div>
+
+  <div class="chart-card" id="tab-panel-h2h" role="tabpanel" aria-labelledby="tab-btn-h2h" hidden>
+    <div class="compare-controls">
+      <label class="compare-field">
+        <span>Team A</span>
+        <select id="h2h-team-a-select"></select>
+      </label>
+      <label class="compare-field">
+        <span>Team B</span>
+        <select id="h2h-team-b-select"></select>
+      </label>
+    </div>
+    <p id="h2h-loading" class="compare-loading">Loading team data&hellip;</p>
+    <div id="h2h-card-wrap" hidden></div>
+  </div>
 </div>
 {% endblock %}
 
@@ -58,5 +77,6 @@
 <script>window.APSN_CHART_DATA_URL = "{{ chart_data_path }}";</script>
 <script src="{{ asset_prefix }}assets/js/rankings-chart.js" defer></script>
 <script src="{{ asset_prefix }}assets/js/rankings-compare.js" defer></script>
+<script src="{{ asset_prefix }}assets/js/rankings-h2h.js" defer></script>
 <script src="{{ asset_prefix }}assets/js/dashboard-tabs.js" defer></script>
 {% endblock %}

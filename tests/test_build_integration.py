@@ -392,6 +392,7 @@ def test_chart_json_export_contains_every_team_and_sortable_stat(wired, monkeypa
     ohio_state = next(t for t in data["teams"] if t["school"] == "Ohio State")
     assert ohio_state["values"]["sp_plus"] == 25.0
     assert ohio_state["values"]["ap_rank"] == 3
+    assert ohio_state["record_display"] == "3-0 (1-2)"  # feeds the Head to Head card
     assert ohio_state["values"]["srs"] is None  # no team_ratings row for SRS in the fixture
 
 
@@ -404,22 +405,26 @@ def test_chart_page_loads_chart_js_and_the_weeks_json_file(wired, monkeypatch):
     assert CHART_DATA_FILENAME in html
 
 
-def test_chart_page_has_rankings_and_compare_tabs(wired, monkeypatch):
-    # Same page now hosts both the (untouched) bar chart and the new
-    # scatter -- both tab panels and both components' scripts must be
-    # present, and Plotly loads alongside Chart.js rather than replacing it
-    # (see the "keep the bar chart, add Plotly only for Compare" decision).
+def test_chart_page_has_bar_scatter_and_head_to_head_tabs(wired, monkeypatch):
+    # Same page hosts the (untouched) bar chart, the scatter, and the new
+    # Head to Head card picker -- all three tab panels and every
+    # component's script must be present, and Plotly loads alongside
+    # Chart.js rather than replacing it (see the "keep the bar chart, add
+    # Plotly only for Compare" decision).
     monkeypatch.setattr("sys.argv", ["build.py"])
     build.main()
     html = (wired / "site" / str(SEASON) / CHART_PAGE_FILENAME).read_text()
-    assert 'id="tab-btn-rankings"' in html
-    assert 'id="tab-btn-compare"' in html
-    assert 'id="tab-panel-rankings"' in html
-    assert 'id="tab-panel-compare"' in html
+    assert 'id="tab-btn-bar"' in html
+    assert 'id="tab-btn-scatter"' in html
+    assert 'id="tab-btn-h2h"' in html
+    assert 'id="tab-panel-bar"' in html
+    assert 'id="tab-panel-scatter"' in html
+    assert 'id="tab-panel-h2h"' in html
     assert "assets/js/vendor/chart.umd.min.js" in html
     assert "assets/js/vendor/plotly-basic.min.js" in html
     assert "assets/js/rankings-chart.js" in html
     assert "assets/js/rankings-compare.js" in html
+    assert "assets/js/rankings-h2h.js" in html
     assert "assets/js/dashboard-tabs.js" in html
 
 

@@ -999,6 +999,20 @@ main {
   object-fit: contain;
 }
 
+/* Head to Head: Team A's value | stat label | Team B's value. Team A stays
+   right-aligned (the default .num), the stat label centers between them,
+   Team B's value is left-aligned instead of right so both values converge
+   on the label rather than one hugging the table's outer edge. */
+.h2h-table th:nth-child(2),
+.h2h-table td:nth-child(2) {
+  text-align: center;
+}
+
+.h2h-table th:last-child,
+.h2h-table td:last-child {
+  text-align: left;
+}
+
 /* ---------- footer ---------- */
 
 .site-footer {
