@@ -24,6 +24,81 @@ def test_rankings_filename_postseason_gets_a_distinct_name():
     assert build.rankings_filename(1, "postseason") == "postseason-rankings-week-01.html"
 
 
+def test_chart_page_filename_regular_has_no_prefix():
+    assert build.chart_page_filename(3, "regular") == "rankings-chart-week-03.html"
+
+
+def test_chart_page_filename_postseason_gets_a_distinct_name():
+    assert build.chart_page_filename(1, "postseason") == "postseason-rankings-chart-week-01.html"
+
+
+def test_chart_data_filename_regular_has_no_prefix():
+    assert build.chart_data_filename(3, "regular") == "rankings-chart-week-03.json"
+
+
+def test_chart_data_filename_postseason_gets_a_distinct_name():
+    assert build.chart_data_filename(1, "postseason") == "postseason-rankings-chart-week-01.json"
+
+
+CHART_SOURCES = [
+    {"id": 1, "name": "SP+", "slug": "sp-plus"},
+    {"id": 2, "name": "Elo", "slug": "elo"},
+]
+
+CHART_TEAMS = [
+    {
+        "school": "Ohio State", "logo_url": "https://a/light.png", "color": "#BB0000",
+        "ap_rank": 3,
+        "cells": [{"slug": "sp-plus", "value": 25.0}, {"slug": "elo", "value": 2100.0}],
+    },
+    {
+        "school": "Indiana", "logo_url": "https://b/light.png", "color": "#990000",
+        "ap_rank": None,
+        "cells": [{"slug": "sp-plus", "value": None}, {"slug": "elo", "value": 1800.0}],
+    },
+]
+
+
+def test_build_chart_export_shape_has_season_week_stats_teams():
+    export = build.build_chart_export(2026, 1, "regular", CHART_TEAMS, CHART_SOURCES)
+    assert export["season"] == 2026
+    assert export["week"] == 1
+    assert export["season_type"] == "regular"
+    assert {s["key"] for s in export["stats"]} == {"ap_rank", "sp_plus", "elo"}
+    assert {t["school"] for t in export["teams"]} == {"Ohio State", "Indiana"}
+
+
+def test_build_chart_export_direction_asc_for_rank_desc_for_ratings():
+    export = build.build_chart_export(2026, 1, "regular", CHART_TEAMS, CHART_SOURCES)
+    directions = {s["key"]: s["direction"] for s in export["stats"]}
+    assert directions["ap_rank"] == "asc"
+    assert directions["sp_plus"] == "desc"
+    assert directions["elo"] == "desc"
+
+
+def test_build_chart_export_national_rank_is_not_included():
+    # Dropped per explicit decision -- it's computed per rating source, not
+    # as one unified number, so there's no single "national_rank" key.
+    export = build.build_chart_export(2026, 1, "regular", CHART_TEAMS, CHART_SOURCES)
+    keys = {s["key"] for s in export["stats"]}
+    assert "national_rank" not in keys
+
+
+def test_build_chart_export_slug_hyphens_become_json_safe_underscores():
+    export = build.build_chart_export(2026, 1, "regular", CHART_TEAMS, CHART_SOURCES)
+    ohio_state = next(t for t in export["teams"] if t["school"] == "Ohio State")
+    assert ohio_state["values"]["sp_plus"] == 25.0
+    assert "sp-plus" not in ohio_state["values"]
+
+
+def test_build_chart_export_missing_value_is_null_not_dropped():
+    export = build.build_chart_export(2026, 1, "regular", CHART_TEAMS, CHART_SOURCES)
+    indiana = next(t for t in export["teams"] if t["school"] == "Indiana")
+    assert indiana["values"]["sp_plus"] is None
+    assert indiana["values"]["ap_rank"] is None
+    assert indiana["values"]["elo"] == 1800.0
+
+
 def test_market_avg_margin_averages_across_providers():
     odds = [{"margin_home": 10.0}, {"margin_home": 6.0}]
     assert build.market_avg_margin(odds) == pytest.approx(8.0)

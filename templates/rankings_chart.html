@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}Rankings Chart, Week {{ week }} &mdash; APSN Big Ten Weekly{% endblock %}
+
+{% block week_switcher %}{% include "_nav.html" %}{% endblock %}
+
+{% block content %}
+<div class="week-page">
+  <div class="week-heading">
+    <h1>Rankings Chart</h1>
+  </div>
+
+  <div class="chart-card">
+    <div class="chart-controls" id="chart-controls" role="group" aria-label="Sort by"></div>
+    <div class="chart-canvas-wrap">
+      <canvas id="rankings-chart" role="img" aria-label="Big Ten teams ranked by the selected stat"></canvas>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ asset_prefix }}assets/js/vendor/chart.umd.min.js"></script>
+<script>window.APSN_CHART_DATA_URL = "{{ chart_data_path }}";</script>
+<script src="{{ asset_prefix }}assets/js/rankings-chart.js" defer></script>
+{% endblock %}

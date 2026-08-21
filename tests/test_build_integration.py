@@ -61,8 +61,8 @@ ODDS = [
 ]
 
 TEAMS = [
-    {"id": 1, "school": "Ohio State", "logo_url": "https://a/light.png"},
-    {"id": 2, "school": "Indiana", "logo_url": "https://b/light.png"},
+    {"id": 1, "school": "Ohio State", "logo_url": "https://a/light.png", "color": "#BB0000"},
+    {"id": 2, "school": "Indiana", "logo_url": "https://b/light.png", "color": "#990000"},
 ]
 
 # Only SP+ and FPI have team_ratings rows -- SRS must render as em dash on
@@ -118,7 +118,7 @@ class FakeCursor:
             self._result = ("all", ODDS)
         elif "max(t) AS latest" in n:
             self._result = ("one", {"latest": ODDS[0]["collected_at"]})
-        elif n.startswith("SELECT id, school, logo_url FROM teams"):
+        elif n.startswith("SELECT id, school, logo_url, color FROM teams"):
             self._result = ("all", TEAMS)
         elif "FROM team_ratings tr" in n:
             self._result = ("all", TEAM_RATINGS)
@@ -359,3 +359,69 @@ def test_rankings_nav_link_appears_on_week_page(wired, monkeypatch):
     build.main()
     html = (wired / "site" / str(SEASON) / f"week-{WEEK:02d}.html").read_text()
     assert f'href="../{SEASON}/{RANKINGS_FILENAME}"' in html
+
+
+CHART_PAGE_FILENAME = f"rankings-chart-week-{WEEK:02d}.html"
+CHART_DATA_FILENAME = f"rankings-chart-week-{WEEK:02d}.json"
+
+
+def test_chart_page_and_json_data_file_are_both_written(wired, monkeypatch):
+    monkeypatch.setattr("sys.argv", ["build.py"])
+    exit_code = build.main()
+    assert exit_code == 0
+
+    chart_page = wired / "site" / str(SEASON) / CHART_PAGE_FILENAME
+    chart_data = wired / "site" / str(SEASON) / CHART_DATA_FILENAME
+    assert chart_page.exists()
+    assert chart_data.exists()
+
+
+def test_chart_json_export_contains_every_team_and_sortable_stat(wired, monkeypatch):
+    import json as _json
+
+    monkeypatch.setattr("sys.argv", ["build.py"])
+    build.main()
+    data = _json.loads((wired / "site" / str(SEASON) / CHART_DATA_FILENAME).read_text())
+
+    assert data["season"] == SEASON
+    assert data["week"] == WEEK
+    assert data["season_type"] == "regular"
+    assert {s["key"] for s in data["stats"]} == {"ap_rank", "sp_plus", "srs", "fpi"}
+    assert {t["school"] for t in data["teams"]} == {"Ohio State", "Indiana"}
+
+    ohio_state = next(t for t in data["teams"] if t["school"] == "Ohio State")
+    assert ohio_state["values"]["sp_plus"] == 25.0
+    assert ohio_state["values"]["ap_rank"] == 3
+    assert ohio_state["values"]["srs"] is None  # no team_ratings row for SRS in the fixture
+
+
+def test_chart_page_loads_chart_js_and_the_weeks_json_file(wired, monkeypatch):
+    monkeypatch.setattr("sys.argv", ["build.py"])
+    build.main()
+    html = (wired / "site" / str(SEASON) / CHART_PAGE_FILENAME).read_text()
+    assert "assets/js/vendor/chart.umd.min.js" in html
+    assert "assets/js/rankings-chart.js" in html
+    assert CHART_DATA_FILENAME in html
+
+
+def test_chart_nav_link_appears_on_week_and_rankings_pages(wired, monkeypatch):
+    monkeypatch.setattr("sys.argv", ["build.py"])
+    build.main()
+    week_html = (wired / "site" / str(SEASON) / f"week-{WEEK:02d}.html").read_text()
+    rankings_html = (wired / "site" / str(SEASON) / RANKINGS_FILENAME).read_text()
+    assert f'href="../{SEASON}/{CHART_PAGE_FILENAME}"' in week_html
+    assert f'href="../{SEASON}/{CHART_PAGE_FILENAME}"' in rankings_html
+
+
+def test_postseason_chart_writes_to_separate_files_from_regular_week(wired, monkeypatch):
+    monkeypatch.setattr("sys.argv", ["build.py", "--year", str(SEASON), "--week", str(WEEK),
+                                      "--season-type", "postseason"])
+    exit_code = build.main()
+    assert exit_code == 0
+
+    postseason_page = wired / "site" / str(SEASON) / f"postseason-{CHART_PAGE_FILENAME}"
+    postseason_data = wired / "site" / str(SEASON) / f"postseason-{CHART_DATA_FILENAME}"
+    regular_page = wired / "site" / str(SEASON) / CHART_PAGE_FILENAME
+    assert postseason_page.exists()
+    assert postseason_data.exists()
+    assert not regular_page.exists()

@@ -9,6 +9,7 @@ Usage:
 """
 import argparse
 import datetime as dt
+import json
 import os
 import pathlib
 import shutil
@@ -106,6 +107,16 @@ def week_filename(week: int, season_type: str) -> str:
 def rankings_filename(week: int, season_type: str) -> str:
     prefix = "" if season_type == "regular" else f"{season_type}-"
     return f"{prefix}rankings-week-{week:02d}.html"
+
+
+def chart_page_filename(week: int, season_type: str) -> str:
+    prefix = "" if season_type == "regular" else f"{season_type}-"
+    return f"{prefix}rankings-chart-week-{week:02d}.html"
+
+
+def chart_data_filename(week: int, season_type: str) -> str:
+    prefix = "" if season_type == "regular" else f"{season_type}-"
+    return f"{prefix}rankings-chart-week-{week:02d}.json"
 
 
 # --- DB reads ----------------------------------------------------------------
@@ -342,7 +353,7 @@ def fetch_team_ratings(conn, season: int, week: int, season_type: str) -> tuple[
         sources = cur.fetchall()
 
         cur.execute(
-            "SELECT id, school, logo_url FROM teams WHERE conference = 'Big Ten' ORDER BY school"
+            "SELECT id, school, logo_url, color FROM teams WHERE conference = 'Big Ten' ORDER BY school"
         )
         big_ten_teams = cur.fetchall()
 
@@ -384,6 +395,7 @@ def fetch_team_ratings(conn, season: int, week: int, season_type: str) -> tuple[
         rows.append({
             "school": team["school"],
             "logo_url": team["logo_url"],
+            "color": team["color"],
             # Big Ten record in parentheses; ranked (sort value) by Big Ten
             # win percentage specifically, not the overall record -- a
             # gaudy nonconference schedule shouldn't outrank actual B1G play.
@@ -393,6 +405,45 @@ def fetch_team_ratings(conn, season: int, week: int, season_type: str) -> tuple[
             "cells": cells,
         })
     return rows, sources
+
+
+def build_chart_export(season: int, week: int, season_type: str,
+                        teams: list[dict], sources: list[dict]) -> dict:
+    """Reshapes fetch_team_ratings()'s output into the JSON the sortable
+    bar chart page fetches and re-sorts client-side, one file per week,
+    pinned the same as the HTML it sits next to. "direction" tells the
+    chart which end is "best" per stat: "asc" for rank-like stats where 1
+    is best, "desc" for rating-like stats where higher is best. National
+    rank is deliberately excluded -- it's computed separately per rating
+    source (compute_national_ranks), not as one unified number, and each
+    source's own rating value already conveys that same ordering."""
+    stats = [{"key": "ap_rank", "label": "AP Poll", "direction": "asc"}]
+    for source in sources:
+        stats.append({
+            "key": source["slug"].replace("-", "_"),
+            "label": source["name"],
+            "direction": "desc",
+        })
+
+    team_rows = []
+    for team in teams:
+        values = {"ap_rank": team["ap_rank"]}
+        for cell in team["cells"]:
+            values[cell["slug"].replace("-", "_")] = cell["value"]
+        team_rows.append({
+            "school": team["school"],
+            "logo_url": team["logo_url"],
+            "color": team["color"],
+            "values": values,
+        })
+
+    return {
+        "season": season,
+        "week": week,
+        "season_type": season_type,
+        "stats": stats,
+        "teams": team_rows,
+    }
 
 
 # --- pure data shaping (no DB, no I/O -- unit testable) -----------------------
@@ -627,6 +678,7 @@ def render_week(conn, env: Environment, season: int, week: int, season_type: str
         all_weeks=all_weeks,
         current_week=(season, week, season_type),
         is_rankings=False,
+        is_chart=False,
     )
 
     out_dir = SITE_DIR / str(season)
@@ -665,6 +717,7 @@ def render_rankings(conn, env: Environment, season: int, week: int, season_type:
         all_weeks=all_weeks,
         current_week=(season, week, season_type),
         is_rankings=True,
+        is_chart=False,
     )
 
     out_dir = SITE_DIR / str(season)
@@ -672,6 +725,40 @@ def render_rankings(conn, env: Environment, season: int, week: int, season_type:
     out_path = out_dir / rankings_filename(week, season_type)
     out_path.write_text(html)
     log(f"wrote {os.path.relpath(out_path, ROOT)} ({len(teams)} teams, {len(sources)} sources)")
+
+    render_rankings_chart(env, season, week, season_type, all_weeks, teams, sources)
+
+
+def render_rankings_chart(env: Environment, season: int, week: int, season_type: str,
+                           all_weeks: list[tuple[int, int, str]],
+                           teams: list[dict], sources: list[dict]) -> None:
+    """Writes the sortable bar chart's JSON data file plus its HTML page.
+    Takes the same teams/sources fetch_team_ratings() already returned to
+    render_rankings() -- no second DB round trip for the same week's
+    ratings."""
+    chart_data = build_chart_export(season, week, season_type, teams, sources)
+
+    out_dir = SITE_DIR / str(season)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    data_path = out_dir / chart_data_filename(week, season_type)
+    data_path.write_text(json.dumps(chart_data))
+
+    template = env.get_template("rankings_chart.html")
+    html = template.render(
+        asset_prefix="../",
+        season=season,
+        week=week,
+        season_type=season_type,
+        chart_data_path=chart_data_filename(week, season_type),
+        all_weeks=all_weeks,
+        current_week=(season, week, season_type),
+        is_rankings=False,
+        is_chart=True,
+    )
+    page_path = out_dir / chart_page_filename(week, season_type)
+    page_path.write_text(html)
+    log(f"wrote {os.path.relpath(page_path, ROOT)} and {os.path.relpath(data_path, ROOT)}")
 
 
 def render_index(env: Environment, default_season: int, default_week: int, default_season_type: str) -> None:
@@ -706,6 +793,7 @@ def main() -> int:
     env.filters["eastern_kickoff"] = eastern_kickoff
     env.globals["week_filename"] = week_filename
     env.globals["rankings_filename"] = rankings_filename
+    env.globals["chart_page_filename"] = chart_page_filename
 
     conn = db.get_connection()
     try:
