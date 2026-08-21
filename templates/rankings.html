@@ -19,7 +19,7 @@
             <th scope="col" class="num" data-sort-key="record">Record</th>
             {% for s in sources %}
             <th scope="col" class="num{% if s.slug == 'fpi' %} sorted-desc{% endif %}" data-sort-key="{{ s.slug }}">
-              <a href="#glossary-{{ s.slug }}">{{ s.name }}</a>
+              {{ s.name }}
             </th>
             {% endfor %}
           </tr>

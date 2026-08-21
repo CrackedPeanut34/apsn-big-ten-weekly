@@ -437,6 +437,7 @@ def build_chart_export(season: int, week: int, season_type: str,
             "logo_url": team["logo_url"],
             "color": team["color"],
             "record_display": team["record_display"],
+            "record_value": team["record_value"],
             "values": values,
         })
 

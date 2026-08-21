@@ -393,6 +393,7 @@ def test_chart_json_export_contains_every_team_and_sortable_stat(wired, monkeypa
     assert ohio_state["values"]["sp_plus"] == 25.0
     assert ohio_state["values"]["ap_rank"] == 3
     assert ohio_state["record_display"] == "3-0 (1-2)"  # feeds the Head to Head card
+    assert ohio_state["record_value"] == pytest.approx(1 / 3)  # 1 conf win, 2 conf losses
     assert ohio_state["values"]["srs"] is None  # no team_ratings row for SRS in the fixture
 
 
