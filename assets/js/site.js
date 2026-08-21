@@ -45,9 +45,10 @@
 })();
 
 // Rankings table: click a column header to sort by it, click again to flip
-// direction. Blank cells (a source that hasn't rated that team yet) always
-// sort to the bottom, regardless of direction. The "school" column sorts
-// alphabetically; every other column sorts numerically on its data-value.
+// direction. First click on a numeric column defaults to highest-first
+// (best team on top); the "school" column defaults to A-Z instead. Blank
+// cells (a source that hasn't rated that team yet) always sort to the
+// bottom, regardless of direction.
 (function () {
   var table = document.getElementById('rankings-table');
   if (!table) return;
@@ -60,7 +61,19 @@
 
       var key = th.dataset.sortKey;
       var isText = key === 'school';
-      var dir = th.classList.contains('sorted-asc') ? 'desc' : 'asc';
+      var dir;
+      if (th.classList.contains('sorted-asc')) {
+        dir = 'desc';
+      } else if (th.classList.contains('sorted-desc')) {
+        dir = 'asc';
+      } else {
+        // First click on a column with no active sort: numeric columns
+        // (Record, SP+, SRS, Elo, FPI) default to highest-first, since
+        // that's the "best team first" reading everywhere else on the
+        // site. Team names default to A-Z instead -- "highest to lowest"
+        // doesn't really apply to a name.
+        dir = isText ? 'asc' : 'desc';
+      }
 
       headers.forEach(function (h) { h.classList.remove('sorted-asc', 'sorted-desc'); });
       th.classList.add(dir === 'asc' ? 'sorted-asc' : 'sorted-desc');

@@ -1015,11 +1015,11 @@ main {
 
 .h2h-better {
   font-weight: 700;
-  color: var(--blue);
+  color: var(--red-text);
 }
 
 .h2h-vs {
-  color: var(--blue);
+  color: var(--red-text);
 }
 
 .h2h-winprob {
@@ -1040,7 +1040,7 @@ main {
   font-family: var(--font-display);
   font-weight: 800;
   font-size: 1.6rem;
-  color: var(--blue);
+  color: var(--red-text);
   white-space: nowrap;
 }
 
@@ -1065,7 +1065,7 @@ main {
 .h2h-winprob-fill {
   position: absolute;
   inset: 0 auto 0 0;
-  background: var(--blue);
+  background: var(--red);
   border-radius: 999px;
 }
 
